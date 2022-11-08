@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Application.fs" />
+    <Compile Include="Buffer.fs" />
+    <Compile Include="Network.fs" />
+    <Compile Include="FileSystem.fs" />
+    <Compile Include="Hash.fs" />
+    <Compile Include="PeerId.fs" />
+    <Compile Include="MetaInfo.fs" />
+    <Compile Include="Tracker.fs" />
+    <Compile Include="Handshake.fs" />
+    <Compile Include="Message.fs" />
+    <Compile Include="Bitfield.fs" />
+    <Compile Include="Rate.fs" />
+    <Compile Include="Block.fs" />
+    <Compile Include="Announcer.fs" />
+    <Compile Include="Connector.fs" />
+    <Compile Include="Pieces.fs" />
+    <Compile Include="IO.fs" />
+    <Compile Include="Peer.fs" />
+    <Compile Include="Torrent.fs" />
+    <Compile Include="Client.fs" />
+    <None Include="paket.references" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\FBitTorrent.BEncode\FBitTorrent.BEncode.fsproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.7">
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
+</Project>

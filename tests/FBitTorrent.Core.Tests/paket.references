@@ -1,0 +1,6 @@
+FSharp.Core
+Microsoft.NET.Test.Sdk
+xunit
+BenchmarkDotNet
+Akka.TestKit
+Akka.TestKit.Xunit2

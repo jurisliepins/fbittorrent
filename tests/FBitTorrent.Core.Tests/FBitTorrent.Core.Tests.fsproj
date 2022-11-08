@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Constants.fs" />
+    <Compile Include="BufferTests.fs" />
+    <Compile Include="NetworkTests.fs" />
+    <Compile Include="FileSystemTests.fs" />
+    <Compile Include="HashTests.fs" />
+    <Compile Include="MetaInfoTests.fs" />
+    <Compile Include="TrackerTests.fs" />
+    <Compile Include="HandshakeTests.fs" />
+    <Compile Include="MessageTests.fs" />
+    <Compile Include="BitfieldTests.fs" />
+    <Compile Include="RateTests.fs" />
+    <Compile Include="BlockTests.fs" />
+    <Compile Include="AnnouncerTests.fs" />
+    <Compile Include="ConnectorTests.fs" />
+    <Compile Include="PiecesTests.fs" />
+    <Compile Include="PeerTests.fs" />
+    <Compile Include="Program.fs" />
+    <Content Include="single_file.torrent">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="multi_file.torrent">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="war_and_peace.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="war_and_peace\file_1.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="war_and_peace\file_2.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="war_and_peace\file_3.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="war_and_peace\file_4.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Include="paket.references" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FBitTorrent.Core\FBitTorrent.Core.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.7">
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+
+</Project>

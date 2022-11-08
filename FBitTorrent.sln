@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sln", "sln", "{17EFB253-A306-4E3F-A3CA-8A228CBFD6B8}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+		paket.dependencies = paket.dependencies
+		build.sh = build.sh
+		build.cmd = build.cmd
+		build.fsx = build.fsx
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{2C1E2086-FA2F-4923-ACF8-EC08E1324FB6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{BD9B94B7-8566-4342-806E-D608E298D434}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FBitTorrent.BEncode", "src\FBitTorrent.BEncode\FBitTorrent.BEncode.fsproj", "{75064222-41E1-452C-BEC7-E3FE655D194B}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FBitTorrent.BEncode.Tests", "tests\FBitTorrent.BEncode.Tests\FBitTorrent.BEncode.Tests.fsproj", "{DC027265-A5F9-4A80-9B74-6C0D165AC95F}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FBitTorrent.Core", "src\FBitTorrent.Core\FBitTorrent.Core.fsproj", "{55CF46FA-3DC1-4C90-BC82-31FF6A53740A}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FBitTorrent.Core.Tests", "tests\FBitTorrent.Core.Tests\FBitTorrent.Core.Tests.fsproj", "{6FC8924C-8DD3-41CA-A36D-B5CD9CE01743}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FBitTorrent.Cli", "src\FBitTorrent.Cli\FBitTorrent.Cli.fsproj", "{B6B50699-53DE-4985-9C27-34C58429BA4F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{75064222-41E1-452C-BEC7-E3FE655D194B} = {2C1E2086-FA2F-4923-ACF8-EC08E1324FB6}
+		{DC027265-A5F9-4A80-9B74-6C0D165AC95F} = {BD9B94B7-8566-4342-806E-D608E298D434}
+		{55CF46FA-3DC1-4C90-BC82-31FF6A53740A} = {2C1E2086-FA2F-4923-ACF8-EC08E1324FB6}
+		{6FC8924C-8DD3-41CA-A36D-B5CD9CE01743} = {BD9B94B7-8566-4342-806E-D608E298D434}
+		{B6B50699-53DE-4985-9C27-34C58429BA4F} = {2C1E2086-FA2F-4923-ACF8-EC08E1324FB6}
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{75064222-41E1-452C-BEC7-E3FE655D194B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{75064222-41E1-452C-BEC7-E3FE655D194B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75064222-41E1-452C-BEC7-E3FE655D194B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{75064222-41E1-452C-BEC7-E3FE655D194B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC027265-A5F9-4A80-9B74-6C0D165AC95F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC027265-A5F9-4A80-9B74-6C0D165AC95F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC027265-A5F9-4A80-9B74-6C0D165AC95F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC027265-A5F9-4A80-9B74-6C0D165AC95F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55CF46FA-3DC1-4C90-BC82-31FF6A53740A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55CF46FA-3DC1-4C90-BC82-31FF6A53740A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55CF46FA-3DC1-4C90-BC82-31FF6A53740A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55CF46FA-3DC1-4C90-BC82-31FF6A53740A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6FC8924C-8DD3-41CA-A36D-B5CD9CE01743}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6FC8924C-8DD3-41CA-A36D-B5CD9CE01743}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6FC8924C-8DD3-41CA-A36D-B5CD9CE01743}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6FC8924C-8DD3-41CA-A36D-B5CD9CE01743}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B6B50699-53DE-4985-9C27-34C58429BA4F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B6B50699-53DE-4985-9C27-34C58429BA4F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B6B50699-53DE-4985-9C27-34C58429BA4F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B6B50699-53DE-4985-9C27-34C58429BA4F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
