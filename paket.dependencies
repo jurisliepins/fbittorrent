@@ -1,0 +1,10 @@
+version 6.2.1
+
+source https://api.nuget.org/v3/index.json
+framework: net6.0
+storage: none
+
+nuget FSharp.Core 6.0.5 content: none
+nuget xunit 2.4.1
+nuget BenchmarkDotNet 0.13.2
+nuget Microsoft.NET.Test.Sdk 16.11.0

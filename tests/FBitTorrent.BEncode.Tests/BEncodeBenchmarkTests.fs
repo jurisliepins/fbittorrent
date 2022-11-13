@@ -1,0 +1,65 @@
+namespace FBitTorrent.BEncode.Tests
+
+open BenchmarkDotNet.Attributes
+open BenchmarkDotNet.Configs
+open BenchmarkDotNet.Loggers
+open BenchmarkDotNet.Running
+open FBitTorrent.BEncode
+open Xunit
+open Xunit.Abstractions
+
+[<MemoryDiagnoser>]
+type BEncodeIntegerBenchmarkTests() =
+    
+    [<Params("i-1e", "i0e", "i1e", "i-9223372036854775808e", "i9223372036854775807e")>]
+    member val EncodedValue = "" with get, set
+    
+    [<Benchmark>]
+    member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
+
+type BEncodeStringBenchmarkTests() =
+    
+    [<Params("10:xxxxxxxxxx")>]
+    member val EncodedValue = "" with get, set
+    
+    [<Benchmark>]
+    member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
+    
+type BEncodeListBenchmarkTests() =
+    
+    [<Params("l6:stringl7:stringsl8:stringedei23456eei12345ee")>]
+    member val EncodedValue = "" with get, set
+    
+    [<Benchmark>]
+    member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
+
+type BEncodeDictionaryBenchmarkTests() =
+    
+    [<Params("d4:testd5:testsli12345ei12345ee2:tod3:tomi12345eeee")>]
+    member val EncodedValue = "" with get, set
+    
+    [<Benchmark>]
+    member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
+
+type BEncodeBenchmarkTests(output: ITestOutputHelper) =
+    
+    member _.Run<'T> () =
+        let logger = AccumulationLogger()
+        let config = ManualConfig.Create(DefaultConfig.Instance)
+                        .AddLogger(logger)
+                        .WithOptions(ConfigOptions.DisableOptimizationsValidator)
+        BenchmarkRunner.Run<'T>(config) |> ignore
+        output.WriteLine(logger.GetLog());
+    
+    [<Fact>]
+    member __.``Benchmark test integer performance`` () = __.Run<BEncodeIntegerBenchmarkTests>()
+    
+    [<Fact>]
+    member __.``Benchmark test string performance`` () = __.Run<BEncodeStringBenchmarkTests>()
+    
+    [<Fact>]
+    member __.``Benchmark test list performance`` () = __.Run<BEncodeListBenchmarkTests>()
+    
+    [<Fact>]
+    member __.``Benchmark test dictionary performance`` () = __.Run<BEncodeDictionaryBenchmarkTests>()
+        
