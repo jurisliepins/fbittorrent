@@ -11,7 +11,7 @@ open Xunit.Abstractions
 [<MemoryDiagnoser>]
 type BEncodeIntegerBenchmarkTests() =
     
-    [<Params("i-1e", "i0e", "i1e", "i-9223372036854775808e", "i9223372036854775807e")>]
+    [<Params("i-9223372036854775808e", "i9223372036854775807e")>]
     member val EncodedValue = "" with get, set
     
     [<Benchmark>]
@@ -20,7 +20,7 @@ type BEncodeIntegerBenchmarkTests() =
 [<MemoryDiagnoser>]
 type BEncodeStringBenchmarkTests() =
     
-    [<Params("10:xxxxxxxxxx")>]
+    [<Params("0:", "10:aaaaaaaaaa")>]
     member val EncodedValue = "" with get, set
     
     [<Benchmark>]
@@ -29,7 +29,7 @@ type BEncodeStringBenchmarkTests() =
 [<MemoryDiagnoser>]
 type BEncodeListBenchmarkTests() =
     
-    [<Params("l6:stringl7:stringsl8:stringedei23456eei12345ee")>]
+    [<Params("le", "l6:stringl7:stringsl8:stringedei23456eei12345ee")>]
     member val EncodedValue = "" with get, set
     
     [<Benchmark>]
@@ -38,7 +38,7 @@ type BEncodeListBenchmarkTests() =
 [<MemoryDiagnoser>]
 type BEncodeDictionaryBenchmarkTests() =
     
-    [<Params("d4:testd5:testsli12345ei12345ee2:tod3:tomi12345eeee")>]
+    [<Params("de", "d4:testd5:testsli12345ei12345ee2:tod3:tomi12345eeee")>]
     member val EncodedValue = "" with get, set
     
     [<Benchmark>]
