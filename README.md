@@ -21,7 +21,7 @@ This is an experimental implementation of the BitTorrent protocol in F# using Ak
 
 ## Building
 
-Run `build.sh` or `build.cmd`.
+Make sure you have (at least) [.NET 6](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) installed and run `build.sh` or `build.cmd`.
 
 [Packet](https://fsprojects.github.io/Paket/get-started.html) is used for dependency management and [FAKE](https://fake.build/guide/getting-started.html) is used to compile the application. 
 
