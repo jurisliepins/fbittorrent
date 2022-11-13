@@ -17,6 +17,7 @@ type BEncodeIntegerBenchmarkTests() =
     [<Benchmark>]
     member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
 
+[<MemoryDiagnoser>]
 type BEncodeStringBenchmarkTests() =
     
     [<Params("10:xxxxxxxxxx")>]
@@ -25,6 +26,7 @@ type BEncodeStringBenchmarkTests() =
     [<Benchmark>]
     member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
     
+[<MemoryDiagnoser>]
 type BEncodeListBenchmarkTests() =
     
     [<Params("l6:stringl7:stringsl8:stringedei23456eei12345ee")>]
@@ -33,6 +35,7 @@ type BEncodeListBenchmarkTests() =
     [<Benchmark>]
     member __.DecodeValue () = BDecode.defaultFromString __.EncodedValue
 
+[<MemoryDiagnoser>]
 type BEncodeDictionaryBenchmarkTests() =
     
     [<Params("d4:testd5:testsli12345ei12345ee2:tod3:tomi12345eeee")>]
