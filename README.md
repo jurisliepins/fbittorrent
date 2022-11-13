@@ -15,11 +15,15 @@ This is an experimental implementation of the BitTorrent protocol in F# using Ak
 
 * Persistence - right now the client will not persist state and will not know where it left off after a restart.
 * Throttling - no way to limit bandwidth usage. 
-* Seeding - only leeching is supported right now.
+* Seeding - only leeching is supported.
 
 # Usage
 
 ## Building
+
+Run `build.sh` or `build.cmd`.
+
+[Packet](https://fsprojects.github.io/Paket/get-started.html) is used for dependency management and [FAKE](https://fake.build/guide/getting-started.html) is used to compile the application. 
 
 ## Running
 
