@@ -74,15 +74,15 @@ type BValue =
                 equals left right
             | BDictionary left, BDictionary right ->
                 let equals (x: Map<BValue, BValue>) (y: Map<BValue, BValue>) =
-                    match x, y with
-                    | x, y when x.Count = y.Count ->
+                    if x.Count = y.Count then
                         Seq.forall
                             (fun (KeyValue(xk, xv)) ->
                                 if not (y.ContainsKey(xk)) then
                                     false
                                 else
                                     y[xk] = xv) x                                 
-                    | _ -> false
+                    else
+                        false
                 equals left right
             | _ -> false
         | _ -> false
@@ -165,7 +165,7 @@ module BValue =
         table[bstr key] |> int |> Operators.int32
         
     let unpackInt64 key (table: Map<BValue, BValue>) =
-        table[bstr key] |> int  |> Operators.int64
+        table[bstr key] |> int |> Operators.int64
         
     let unpackStr key (table: Map<BValue, BValue>) =
         table[bstr key] |> str
