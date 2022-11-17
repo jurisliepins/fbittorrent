@@ -64,12 +64,11 @@ type BValue =
                 let rec equals (x: BValue list) (y: BValue list) =
                      match x, y with
                      | [], [] -> true
-                     | x::xs,
-                       y::ys ->
-                           if not (x.Equals(y)) then
-                               false
-                           else
+                     | x::xs, y::ys ->
+                           if x.Equals(y) then
                                equals xs ys
+                           else
+                               false
                      | _ -> false
                 equals left right
             | BDictionary left, BDictionary right ->
@@ -77,10 +76,10 @@ type BValue =
                     if x.Count = y.Count then
                         Seq.forall
                             (fun (KeyValue(xk, xv)) ->
-                                if not (y.ContainsKey(xk)) then
-                                    false
+                                if y.ContainsKey(xk) then
+                                    y[xk] = xv
                                 else
-                                    y[xk] = xv) x                                 
+                                    false) x
                     else
                         false
                 equals left right
