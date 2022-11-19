@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="NetworkTests.fs" />
+    <Compile Include="MessageTests.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
   </ItemGroup>
