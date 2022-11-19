@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Constants.fs" />
     <None Include="paket.references" />
   </ItemGroup>
   
