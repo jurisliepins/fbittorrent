@@ -11,6 +11,7 @@
     <Compile Include="NetworkTests.fs" />
     <Compile Include="Constants.fs" />
     <Compile Include="FileSystemTests.fs" />
+    <Compile Include="HashTests.fs" />
     <Compile Include="MessageTests.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />

@@ -9,6 +9,7 @@
     <None Include="paket.references" />
     <Compile Include="Network.fs" />
     <Compile Include="FileSystem.fs" />
+    <Compile Include="Hash.fs" />
     <Compile Include="Message.fs" />
   </ItemGroup>
   
