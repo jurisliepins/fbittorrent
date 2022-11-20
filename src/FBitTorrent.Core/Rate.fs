@@ -42,7 +42,7 @@ type Rate =
 
     override __.ToString() =
         let speed = __.GetSpeed()
-        if   speed < Rate.KB then $"%.3f{speed} B/s"
+        if speed < Rate.KB then $"%.3f{speed} B/s"
         elif speed < Rate.MB then $"%.3f{(speed / Rate.KB)} KB/s"
         elif speed < Rate.GB then $"%.3f{(speed / Rate.MB)} MB/s"
         elif speed < Rate.TB then $"%.3f{(speed / Rate.GB)} GB/s"
