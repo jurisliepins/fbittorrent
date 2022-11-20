@@ -1,6 +1,6 @@
 namespace FBitTorrent.Core
 
 module Application =
-    let Name = "FBitTorrent"
-    let Version = 0.01
+    let [<Literal>] Name = "FBitTorrent"
+    let [<Literal>] Version = 0.01
     
