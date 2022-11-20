@@ -14,6 +14,7 @@
     <Compile Include="Tracker.fs" />
     <Compile Include="Handshake.fs" />
     <Compile Include="Message.fs" />
+    <Compile Include="Bitfield.fs" />
     <None Include="paket.references" />
   </ItemGroup>
   
