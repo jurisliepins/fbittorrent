@@ -10,6 +10,7 @@
     <Compile Include="FileSystem.fs" />
     <Compile Include="Hash.fs" />
     <Compile Include="MetaInfo.fs" />
+    <Compile Include="Handshake.fs" />
     <Compile Include="Message.fs" />
     <None Include="paket.references" />
   </ItemGroup>

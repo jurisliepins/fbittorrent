@@ -8,11 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="NetworkTests.fs" />
     <Compile Include="Constants.fs" />
+    <Compile Include="NetworkTests.fs" />
     <Compile Include="FileSystemTests.fs" />
     <Compile Include="HashTests.fs" />
     <Compile Include="MetaInfoTests.fs" />
+    <Compile Include="HandshakeTests.fs" />
     <Compile Include="MessageTests.fs" />
     <Compile Include="Program.fs" />
     <Content Include="single_file.torrent">

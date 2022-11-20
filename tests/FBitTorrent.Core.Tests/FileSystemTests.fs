@@ -7,53 +7,53 @@ open Xunit
 
 module FileSystemTests =
     
-    let validFilePath = ".\\test.txt"
-    let validDirPath = ".\\test"
+    let [<Literal>] ValidFilePath = ".\\test.txt"
+    let [<Literal>] ValidDirPath = ".\\test"
     
-    let invalidFilePath = ""
-    let invalidDirPath = ""
+    let [<Literal>] InvalidFilePath = ""
+    let [<Literal>] InvalidDirPath = ""
     
     let local = FileSystem.createLocal ()
     
     [<Fact>]
     let ``Test local file exists`` () =
-        let stream = File.Create validFilePath
+        let stream = File.Create ValidFilePath
         stream.Close()
-        Assert.True(local.FileExists validFilePath)
-        File.Delete validFilePath
+        Assert.True(local.FileExists ValidFilePath)
+        File.Delete ValidFilePath
         
     [<Fact>]
     let ``Test local file doesn't exists`` () =
-        Assert.False(local.FileExists validFilePath)
-        File.Delete validFilePath
+        Assert.False(local.FileExists ValidFilePath)
+        File.Delete ValidFilePath
         
     [<Fact>]
     let ``Test local dir exists`` () =
-        let _ = Directory.CreateDirectory validDirPath
-        Assert.True(local.DirectoryExists validDirPath)
-        Directory.Delete validDirPath
+        let _ = Directory.CreateDirectory ValidDirPath
+        Assert.True(local.DirectoryExists ValidDirPath)
+        Directory.Delete ValidDirPath
         
     [<Fact>]
     let ``Test local dir doesn't exists`` () =
-        Assert.False(local.DirectoryExists validDirPath)
+        Assert.False(local.DirectoryExists ValidDirPath)
     
     [<Fact>]
     let ``Test local open or create success`` () =
-        let stream = File.Create validFilePath
+        let stream = File.Create ValidFilePath
         stream.Close()
-        let stream = local.OpenOrCreate validFilePath
+        let stream = local.OpenOrCreate ValidFilePath
         stream.Close()
-        File.Delete validFilePath
+        File.Delete ValidFilePath
         
     [<Fact>]
     let ``Test local file open or create failure`` () =
-        Assert.ThrowsAny<Exception>(fun () -> local.OpenOrCreate invalidFilePath |> ignore)
+        Assert.ThrowsAny<Exception>(fun () -> local.OpenOrCreate InvalidFilePath |> ignore)
         
     [<Fact>]
     let ``Test local create dir success`` () =
-        let _ = local.CreateDirectory validDirPath
-        Directory.Delete validDirPath
+        let _ = local.CreateDirectory ValidDirPath
+        Directory.Delete ValidDirPath
         
     [<Fact>]
     let ``Test local create dir failure`` () =
-        Assert.ThrowsAny<Exception>(fun () -> local.CreateDirectory invalidDirPath)
+        Assert.ThrowsAny<Exception>(fun () -> local.CreateDirectory InvalidDirPath)
