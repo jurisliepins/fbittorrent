@@ -4,6 +4,11 @@ module Rate =
     let [<Literal>] Smoothing = 0.02
     let [<Literal>] Capacity = 5
 
+    let KB = 1024.0
+    let MB = 1024.0 * 1024.0
+    let GB = 1024.0 * 1024.0 * 1024.0
+    let TB = 1024.0 * 1024.0 * 1024.0 * 1024.0
+
 type Rate =
     val mutable private speeds: int64[]
     val mutable private byteCount: int64
@@ -15,9 +20,9 @@ type Rate =
         pointer = 0
         length = 0 }
     
-    member __.Update(lastBytes: int64, per: int) =
+    member __.Update(lastBytes: int64) =
         let idx = (__.pointer + __.length) % __.speeds.Length
-        __.speeds[idx] <- (lastBytes - __.byteCount) / int64 per
+        __.speeds[idx] <- (lastBytes - __.byteCount)
         __.byteCount <- lastBytes
         if __.length >= __.speeds.Length then
             __.pointer <- __.pointer + 1
@@ -37,10 +42,10 @@ type Rate =
 
     override __.ToString() =
         let speed = __.GetSpeed()
-        if   speed < (1024.0)                            then $"%.3f{(speed)} B/s"
-        elif speed < (1024.0 * 1024.0)                   then $"%.3f{(speed / 1024.0)} KB/s"
-        elif speed < (1024.0 * 1024.0 * 1024.0)          then $"%.3f{(speed / 1024.0 / 1024.0)} MB/s"
-        elif speed < (1024.0 * 1024.0 * 1024.0 * 1024.0) then $"%.3f{(speed / 1024.0 / 1024.0 / 1024.0)} GB/s"
+        if   speed < Rate.KB then $"%.3f{speed} B/s"
+        elif speed < Rate.MB then $"%.3f{(speed / Rate.KB)} KB/s"
+        elif speed < Rate.GB then $"%.3f{(speed / Rate.MB)} MB/s"
+        elif speed < Rate.TB then $"%.3f{(speed / Rate.GB)} GB/s"
         else
             failwith $"Invalid speed value %.3f{speed}"
     
