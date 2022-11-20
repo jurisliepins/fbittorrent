@@ -15,6 +15,7 @@
     <Compile Include="Handshake.fs" />
     <Compile Include="Message.fs" />
     <Compile Include="Bitfield.fs" />
+    <Compile Include="Block.fs" />
     <None Include="paket.references" />
   </ItemGroup>
   

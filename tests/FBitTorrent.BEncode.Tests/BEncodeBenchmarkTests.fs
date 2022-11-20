@@ -54,15 +54,15 @@ type BEncodeBenchmarkTests(output: ITestOutputHelper) =
         BenchmarkRunner.Run<'T>(config) |> ignore
         output.WriteLine(logger.GetLog());
     
-    [<Fact>]
+    [<Fact(Skip = "Benchmark tests should be run explicitly")>]
     member __.``Benchmark test integer performance`` () = __.Run<BEncodeIntegerBenchmarkTests>()
     
-    [<Fact>]
+    [<Fact(Skip = "Benchmark tests should be run explicitly")>]
     member __.``Benchmark test string performance`` () = __.Run<BEncodeStringBenchmarkTests>()
     
-    [<Fact>]
+    [<Fact(Skip = "Benchmark tests should be run explicitly")>]
     member __.``Benchmark test list performance`` () = __.Run<BEncodeListBenchmarkTests>()
     
-    [<Fact>]
+    [<Fact(Skip = "Benchmark tests should be run explicitly")>]
     member __.``Benchmark test dictionary performance`` () = __.Run<BEncodeDictionaryBenchmarkTests>()
         
