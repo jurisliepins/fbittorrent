@@ -169,12 +169,12 @@ module Tracker =
             match dict |> BValue.unpackStrOpt "failure reason" with
             | None ->
                 { WarningMessage = dict |> BValue.unpackStrOpt "warning message"
-                  Interval       = dict |> BValue.unpackInt64  "interval"
+                  Interval       = dict |> BValue.unpackInt64 "interval"
                   MinInterval    = dict |> BValue.unpackIntOpt "min interval"
                   TrackerId      = dict |> BValue.unpackStrOpt "tracker id"
                   Complete       = dict |> BValue.unpackIntOpt "complete"
                   Incomplete     = dict |> BValue.unpackIntOpt "incomplete"
-                  Peers          = dict |> BValue.unpackWith   "peers" parsePeers }
+                  Peers          = dict |> BValue.unpackWith "peers" parsePeers }
             | Some failureReason ->
                 failwith $"Server responded with failure reason - %s{failureReason}"
         | value ->
