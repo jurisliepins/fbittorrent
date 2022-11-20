@@ -6,10 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Application.fs" />
     <Compile Include="Network.fs" />
     <Compile Include="FileSystem.fs" />
     <Compile Include="Hash.fs" />
     <Compile Include="MetaInfo.fs" />
+    <Compile Include="Tracker.fs" />
     <Compile Include="Handshake.fs" />
     <Compile Include="Message.fs" />
     <None Include="paket.references" />
