@@ -94,7 +94,7 @@ module BDecode =
         | _ -> 
             failwith $"Invalid encoded input - not a %A{BDictionaryType}"
     
-    let fromStream encoding (stream: MemoryStream) =
+    let fromStream encoding (stream: Stream) =
         let reader = new BStreamReader(stream, encoding)
         read reader encoding
     
@@ -104,7 +104,7 @@ module BDecode =
     let fromString encoding (value: string) =
         fromBytes encoding (encoding.GetBytes(value))
         
-    let defaultFromStream (value: MemoryStream) =
+    let defaultFromStream (value: Stream) =
         fromStream defaultEncoding value
         
     let defaultFromBytes (value: byte[]) =

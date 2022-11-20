@@ -61,11 +61,11 @@ module BEncode =
         let stream = new MemoryStream()
         let writer = new BStreamWriter(stream, encoding)
         write writer encoding value
-        stream
+        stream :> Stream
     
     let toBytes (encoding: Encoding) value =
         use stream = toStream encoding value
-        stream.ToArray()
+        (stream :?> MemoryStream).ToArray()
         
     let toString (encoding: Encoding) value =
         encoding.GetString(toBytes encoding value)

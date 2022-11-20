@@ -12,10 +12,10 @@
     <Compile Include="BEncodeBenchmarkTests.fs" />
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
-    <Content Include="multi_file.torrent">
+    <Content Include="single_file.torrent">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="single_file.torrent">
+    <Content Include="multi_file.torrent">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -25,7 +25,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Remove="FSharp.Core" />
+    <PackageReference Update="FSharp.Core" Version="6.0.7" />
   </ItemGroup>
   
   <Import Project="..\..\.paket\Paket.Restore.targets" />

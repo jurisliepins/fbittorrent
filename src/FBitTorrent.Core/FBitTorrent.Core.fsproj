@@ -6,19 +6,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="paket.references" />
     <Compile Include="Network.fs" />
     <Compile Include="FileSystem.fs" />
     <Compile Include="Hash.fs" />
+    <Compile Include="MetaInfo.fs" />
     <Compile Include="Message.fs" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <PackageReference Remove="FSharp.Core" />
+    <None Include="paket.references" />
   </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\FBitTorrent.BEncode\FBitTorrent.BEncode.fsproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.7" />
   </ItemGroup>
 
   <Import Project="..\..\.paket\Paket.Restore.targets" />
