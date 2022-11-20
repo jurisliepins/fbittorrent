@@ -5,6 +5,10 @@ framework: net6.0
 storage: none
 
 nuget FSharp.Core 6.0.7 content: none
+nuget Akka.FSharp 1.4.35
+
 nuget xunit 2.4.1
 nuget BenchmarkDotNet 0.13.2
 nuget Microsoft.NET.Test.Sdk 16.11.0
+nuget Akka.TestKit 1.4.35
+nuget Akka.TestKit.Xunit2 1.4.35

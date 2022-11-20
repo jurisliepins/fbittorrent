@@ -18,6 +18,7 @@
     <Compile Include="MessageTests.fs" />
     <Compile Include="BitfieldTests.fs" />
     <Compile Include="BlockTests.fs" />
+    <Compile Include="AnnouncerTests.fs" />
     <Compile Include="Program.fs" />
     <Content Include="single_file.torrent">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

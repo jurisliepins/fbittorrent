@@ -16,6 +16,7 @@
     <Compile Include="Message.fs" />
     <Compile Include="Bitfield.fs" />
     <Compile Include="Block.fs" />
+    <Compile Include="Announcer.fs" />
     <None Include="paket.references" />
   </ItemGroup>
   
