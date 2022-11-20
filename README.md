@@ -1,9 +1,7 @@
 FBitTorrent
 ===========
 
-# What and why?
-
-This is an experimental implementation of the BitTorrent protocol in F# using Akka.NET written for fun :slightly_smiling_face:. 
+Experimental implementation of the BitTorrent protocol in F# using Akka.NET. 
 
 ## Supported BEPs
 
@@ -16,6 +14,7 @@ This is an experimental implementation of the BitTorrent protocol in F# using Ak
 * Persistence - right now the client will not persist state and will not know where it left off after a restart.
 * Throttling - no way to limit bandwidth usage. 
 * Seeding - only leeching is supported.
+* Other extensions.
 
 # Usage
 
