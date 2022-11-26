@@ -10,8 +10,6 @@ open FBitTorrent.Core
 
 module Tracker =
     
-    let DefaultEncoding = Encoding.Latin1
-    
     type Event =
         | Started
         | Stopped
@@ -158,12 +156,12 @@ module Tracker =
         |> Async.RunSynchronously
     
     let parse (bytes: byte[]) =
-        match BDecode.fromBytes DefaultEncoding bytes with
+        match BDecode.defaultFromBytes bytes with
         | BDictionary dict ->
             let parsePeers value =
                 match value with
                 | BList   packed -> unpackPeerList packed
-                | BString packed -> unpackPeerStr (DefaultEncoding.GetBytes(packed))
+                | BString packed -> unpackPeerStr (Encoding.Latin1.GetBytes(packed))
                 | value ->
                     failwith $"Unexpected 'peer' value %A{value} - expected %A{BListType} or %A{BStringType}"
             match dict |> BValue.unpackStrOpt "failure reason" with

@@ -23,7 +23,7 @@ type AnnouncerTests() =
                 .Add(BValue.bstr "interval", BValue.bint 0L)
                 .Add(BValue.bstr "peers", BValue.blist [])
             |> BValue.bdict
-            |> BEncode.toBytes Tracker.DefaultEncoding
+            |> BEncode.defaultToBytes
         Announcer.actorFn call mailbox
         
     let failureAnnouncerFn mailbox =
@@ -31,7 +31,7 @@ type AnnouncerTests() =
             Map.empty
                 .Add(BValue.bstr "failure reason", BValue.bstr "Test failure")
             |> BValue.bdict
-            |> BEncode.toBytes Tracker.DefaultEncoding
+            |> BEncode.defaultToBytes
         Announcer.actorFn call mailbox
     
     [<Fact>]

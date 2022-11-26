@@ -1,6 +1,7 @@
 ﻿namespace FBitTorrent.Core.Tests
 
 open System.IO
+open System.Text
 open Xunit
 open FBitTorrent.Core
 
@@ -27,7 +28,7 @@ module MetaInfoTests =
 
     [<Fact>]
     let ``Test decode single file info and hash from string`` () =
-        let metaInfo = fromString (DefaultEncoding.GetString(Constants.SingleFileMetaInfoBytes))
+        let metaInfo = fromString (Encoding.Latin1.GetString(Constants.SingleFileMetaInfoBytes))
         match metaInfo.Info with
         | SingleFileInfo info ->
             Assert.Equal<Hash>(Constants.SingleFileMetaInfoHash, (singleFileInfoHash info))
@@ -85,7 +86,7 @@ module MetaInfoTests =
 
     [<Fact>]
     let ``Test decode multi file info and hash from string`` () =
-        let metaInfo = fromString (DefaultEncoding.GetString(Constants.MultiFileMetaInfoBytes))
+        let metaInfo = fromString (Encoding.Latin1.GetString(Constants.MultiFileMetaInfoBytes))
         match metaInfo.Info with
         | MultiFileInfo info ->
             Assert.Equal<Hash>(Constants.MultiFileMetaInfoHash, (multiFileInfoHash info))

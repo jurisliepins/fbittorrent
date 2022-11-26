@@ -1,6 +1,7 @@
 ﻿namespace FBitTorrent.Core.Tests
 
 open System.Net
+open System.Text
 open Xunit
 open FBitTorrent.BEncode
 open FBitTorrent.Core
@@ -23,7 +24,7 @@ module TrackerTests =
                     .Add(BValue.bstr "peers", BValue.blist [peer])
             response
             |> BValue.bdict
-            |> BEncode.toBytes Tracker.DefaultEncoding
+            |> BEncode.defaultToBytes
         let response =
             defaultAnnounce
                 Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
@@ -45,10 +46,10 @@ module TrackerTests =
             let response =
                 Map.empty
                     .Add(BValue.bstr "interval", BValue.bint 1800L)
-                    .Add(BValue.bstr "peers", BValue.bstr (DefaultEncoding.GetString(peer)) )
+                    .Add(BValue.bstr "peers", BValue.bstr (Encoding.Latin1.GetString(peer)) )
             response
             |> BValue.bdict
-            |> BEncode.toBytes DefaultEncoding
+            |> BEncode.defaultToBytes
         let response =
             defaultAnnounce
                 Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
@@ -70,7 +71,7 @@ module TrackerTests =
                     .Add(BValue.bstr "failure reason", BValue.bstr "Test failure")
             response
             |> BValue.bdict
-            |> BEncode.toBytes DefaultEncoding
+            |> BEncode.defaultToBytes
         try
             defaultAnnounce
                 Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call

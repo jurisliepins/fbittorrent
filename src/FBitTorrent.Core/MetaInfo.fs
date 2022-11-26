@@ -42,8 +42,6 @@ type MetaInfo =
 
 module MetaInfo =
 
-    let DefaultEncoding = Encoding.Latin1
-    
     let unpackPieceLength table =
         table
         |> BValue.unpackInt32 "piece length"
@@ -56,7 +54,7 @@ module MetaInfo =
     
     let unpackPieces table =
         let map value =
-            DefaultEncoding
+            Encoding.Latin1
                 .GetBytes(BValue.str value)
                 .Chunk(20)
                 .Select(fun bytes -> Hash bytes)
@@ -67,7 +65,7 @@ module MetaInfo =
     let unpackName table =
         table
         |> BValue.unpackStr "name"
-        |> DefaultEncoding.GetBytes
+        |> Encoding.Latin1.GetBytes
         |> Encoding.UTF8.GetString
     
     let unpackLength table =
@@ -83,7 +81,7 @@ module MetaInfo =
             BValue.list value
             |> List.map (fun value ->
                             BValue.str value
-                            |> DefaultEncoding.GetBytes
+                            |> Encoding.Latin1.GetBytes
                             |> Encoding.UTF8.GetString)
         table
         |> BValue.unpackWith "path" map
@@ -115,7 +113,7 @@ module MetaInfo =
     let unpackAnnounce table =
         table
         |> BValue.unpackStr "announce"
-        |> DefaultEncoding.GetBytes
+        |> Encoding.Latin1.GetBytes
         |> Encoding.UTF8.GetString
     
     let unpackAnnounceList table =
@@ -124,7 +122,7 @@ module MetaInfo =
             |> List.map (fun value ->
                              value
                              |> BValue.str
-                             |> DefaultEncoding.GetBytes
+                             |> Encoding.Latin1.GetBytes
                              |> Encoding.UTF8.GetString)
         let mapList1 value =
             BValue.list value
@@ -144,7 +142,7 @@ module MetaInfo =
         let map value =
             value
             |> BValue.str
-            |> DefaultEncoding.GetBytes
+            |> Encoding.Latin1.GetBytes
             |> Encoding.UTF8.GetString
         table
         |> BValue.unpackOptWith "comment" map
@@ -153,7 +151,7 @@ module MetaInfo =
         let map value =
             value
             |> BValue.str
-            |> DefaultEncoding.GetBytes
+            |> Encoding.Latin1.GetBytes
             |> Encoding.UTF8.GetString
         table
         |> BValue.unpackOptWith "created by" map
@@ -162,7 +160,7 @@ module MetaInfo =
         let map value =
             value
             |> BValue.str
-            |> DefaultEncoding.GetBytes
+            |> Encoding.Latin1.GetBytes
             |> Encoding.UTF8.GetString
         table
         |> BValue.unpackOptWith "encoding" map
@@ -205,7 +203,7 @@ module MetaInfo =
     
     let packPieces (value: Hash[]) table =
         let value =
-            DefaultEncoding.GetString(value
+            Encoding.Latin1.GetString(value
             |> Array.map (fun piece -> piece.ToArray())
             |> Array.concat)
         table
@@ -215,7 +213,7 @@ module MetaInfo =
         let value =
             value
             |> Encoding.UTF8.GetBytes
-            |> DefaultEncoding.GetString
+            |> Encoding.Latin1.GetString
         table
         |> BValue.packStr "name" value 
 
@@ -233,7 +231,7 @@ module MetaInfo =
             |> List.map (fun value ->
                              value
                              |> Encoding.UTF8.GetBytes
-                             |> DefaultEncoding.GetString
+                             |> Encoding.Latin1.GetString
                              |> BValue.bstr)
         table
         |> BValue.packList "path" value
@@ -277,7 +275,7 @@ module MetaInfo =
         let value =
             value
             |> Encoding.UTF8.GetBytes
-            |> DefaultEncoding.GetString
+            |> Encoding.Latin1.GetString
         table
         |> BValue.packStr "announce" value
     
@@ -287,7 +285,7 @@ module MetaInfo =
                            |> List.map (fun (value: string) ->
                                BValue.bstr (value
                                             |> Encoding.UTF8.GetBytes
-                                            |> DefaultEncoding.GetString))))
+                                            |> Encoding.Latin1.GetString))))
         let mapList1 value =
             BValue.blist (value |> List.map mapList2)
         let map =
@@ -305,7 +303,7 @@ module MetaInfo =
         let map (value: string) =
             value
             |> Encoding.UTF8.GetBytes
-            |> DefaultEncoding.GetString
+            |> Encoding.Latin1.GetString
             |> BValue.bstr
         table
         |> BValue.packOptWith "comment" value map
@@ -314,7 +312,7 @@ module MetaInfo =
         let map (value: string) =
             value
             |> Encoding.UTF8.GetBytes
-            |> DefaultEncoding.GetString
+            |> Encoding.Latin1.GetString
             |> BValue.bstr
         table
         |> BValue.packOptWith "created by" value map
@@ -323,7 +321,7 @@ module MetaInfo =
         let map (value: string) =
             value
             |> Encoding.UTF8.GetBytes
-            |> DefaultEncoding.GetString
+            |> Encoding.Latin1.GetString
             |> BValue.bstr
         table
         |> BValue.packOptWith "encoding" value map
@@ -357,13 +355,13 @@ module MetaInfo =
             failwith $"Invalid encoded MetaInfo - expected %A{BDictionaryType} and got %A{value}"
     
     let fromStream (value: Stream) =
-        fromBValue (BDecode.fromStream DefaultEncoding value)
+        fromBValue (BDecode.defaultFromStream value)
     
     let fromBytes (value: byte[]) =
-        fromBValue (BDecode.fromBytes DefaultEncoding value)
+        fromBValue (BDecode.defaultFromBytes value)
 
     let fromString (value: string) =
-        fromBValue (BDecode.fromString DefaultEncoding value)
+        fromBValue (BDecode.defaultFromString value)
 
     let toBValue (mi: MetaInfo) =
         Map.empty
@@ -372,15 +370,15 @@ module MetaInfo =
 
     let toStream (mi: MetaInfo) =
         toBValue mi
-        |> BEncode.toStream DefaultEncoding
+        |> BEncode.defaultToStream
     
     let toBytes (mi: MetaInfo) =
         toBValue mi
-        |> BEncode.toBytes DefaultEncoding
+        |> BEncode.defaultToBytes
     
     let toString (mi: MetaInfo) =
         toBValue mi
-        |> BEncode.toString DefaultEncoding
+        |> BEncode.defaultToString
     
     let singleFileInfoHash (info: SingleFileInfo) =
         Map.empty
@@ -391,7 +389,7 @@ module MetaInfo =
         |> packPrivate info.Private
         |> packMD5Sum info.MD5Sum
         |> BValue.bdict
-        |> BEncode.toBytes DefaultEncoding
+        |> BEncode.defaultToBytes
         |> Hash.ComputeBlock
 
     let multiFileInfoHash (info: MultiFileInfo) =
@@ -402,7 +400,7 @@ module MetaInfo =
         |> packName info.Name
         |> packPrivate info.Private
         |> BValue.bdict
-        |> BEncode.toBytes DefaultEncoding
+        |> BEncode.defaultToBytes
         |> Hash.ComputeBlock
 
     let hash (info: Info) =

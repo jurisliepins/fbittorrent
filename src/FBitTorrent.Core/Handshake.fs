@@ -14,8 +14,6 @@ type Handshake =
     
 module Handshake =
     
-    let DefaultEncoding = Encoding.Latin1
-    
     let ProtocolBytes = [| 66uy; 105uy; 116uy; 84uy; 111uy; 114uy; 114uy; 101uy; 110uy; 116uy; 32uy;
                             112uy; 114uy; 111uy; 116uy; 111uy; 99uy; 111uy; 108uy |]
     let ReservedBytes = [| 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; |]
@@ -52,7 +50,7 @@ module Handshake =
         stream.ToArray()
         
     let toString handshake =
-        DefaultEncoding.GetString(toBytes handshake)
+        Encoding.Latin1.GetString(toBytes handshake)
         
     let fromBytes (bytes: byte[]) =
         use stream = new MemoryStream(bytes)
@@ -60,7 +58,7 @@ module Handshake =
         read reader
         
     let fromString (string: string) =
-        fromBytes (DefaultEncoding.GetBytes(string))
+         fromBytes (Encoding.Latin1.GetBytes(string))
         
 module HandshakeExtensions =
     type IConnection with

@@ -1,6 +1,7 @@
 ﻿namespace FBitTorrent.Core.Tests
 
 open System.IO
+open System.Text
 open FBitTorrent.Core
 open Xunit
 
@@ -83,7 +84,7 @@ module HandshakeTests =
     [<Fact>]
     let ``Test should convert handshake to string`` () =
         let converted = Handshake.toString (Handshake.defaultCreate InfoHashBytes PeerIdBytes)
-        Assert.Equal<string>((Handshake.DefaultEncoding.GetString HandshakeBytes), converted)
+        Assert.Equal<string>((Encoding.Latin1.GetString HandshakeBytes), converted)
         
     [<Fact>]
     let ``Test should convert handshake from bytes`` () =
@@ -95,7 +96,7 @@ module HandshakeTests =
         
     [<Fact>]
     let ``Test should convert handshake from string`` () =
-        let (Handshake (proto, res, ih, pid)) = Handshake.fromString (Handshake.DefaultEncoding.GetString HandshakeBytes)
+        let (Handshake (proto, res, ih, pid)) = Handshake.fromString (Encoding.Latin1.GetString HandshakeBytes)
         Assert.Equal<byte[]>(Handshake.ProtocolBytes, proto)
         Assert.Equal<byte[]>(Handshake.ReservedBytes, res)
         Assert.Equal<byte[]>(InfoHashBytes, ih)

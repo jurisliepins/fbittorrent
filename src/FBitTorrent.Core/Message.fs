@@ -102,8 +102,6 @@ with
 
 module Message =
 
-    let DefaultEncoding = Encoding.Latin1
-    
     let DefaultWriteTimeoutMillis = 120_000
     let DefaultReadTimeoutMillis = 120_000
     
@@ -240,7 +238,7 @@ module Message =
         stream.ToArray()
         
     let toString message =
-        DefaultEncoding.GetString(toBytes message)
+        Encoding.Latin1.GetString(toBytes message)
     
     let fromBytes (bytes: byte[]) =
         use stream = new MemoryStream(bytes)
@@ -248,7 +246,7 @@ module Message =
         read reader
         
     let fromString (string: string) =
-        fromBytes (DefaultEncoding.GetBytes(string))
+        fromBytes (Encoding.Latin1.GetBytes(string))
         
 module MessageExtensions =
     type IConnection with
