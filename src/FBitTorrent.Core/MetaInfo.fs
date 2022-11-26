@@ -403,7 +403,7 @@ module MetaInfo =
         |> BEncode.defaultToBytes
         |> Hash.ComputeBlock
 
-    let hash (info: Info) =
+    let infoHash (info: Info) =
         match info with
         | SingleFileInfo sfi -> singleFileInfoHash sfi
         | MultiFileInfo  mfi -> multiFileInfoHash  mfi    
