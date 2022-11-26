@@ -79,4 +79,4 @@ type AnnouncerTests() =
     member __.``Test should schedule announce fail`` () =
         let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
         let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
-        assertFailure announcerCommandResult       
+        assertFailure announcerCommandResult

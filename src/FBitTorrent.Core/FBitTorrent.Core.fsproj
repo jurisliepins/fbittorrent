@@ -18,6 +18,7 @@
     <Compile Include="Block.fs" />
     <Compile Include="Rate.fs" />
     <Compile Include="Announcer.fs" />
+    <Compile Include="Connector.fs" />
     <None Include="paket.references" />
   </ItemGroup>
   

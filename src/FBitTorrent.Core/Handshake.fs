@@ -1,6 +1,8 @@
 ﻿namespace FBitTorrent.Core
 
+open System
 open System.IO
+open System.Net
 open System.Text
 open FBitTorrent.Core
 
@@ -11,8 +13,15 @@ type Handshake =
         Reserved: byte[] * 
         InfoHash: byte[] * 
         PeerId:   byte[]
+
+type IHandshakeConnection =
+    inherit IDisposable
+    abstract member Connection: IConnection with get
+    abstract member WriteHandshake: Handshake -> unit
+    abstract member ReadHandshake: unit -> Handshake
     
 module Handshake =
+    type Connect = IPEndPoint -> IHandshakeConnection
     
     let ProtocolBytes = [| 66uy; 105uy; 116uy; 84uy; 111uy; 114uy; 114uy; 101uy; 110uy; 116uy; 32uy;
                             112uy; 114uy; 111uy; 116uy; 111uy; 99uy; 111uy; 108uy |]
@@ -59,12 +68,16 @@ module Handshake =
         
     let fromString (string: string) =
          fromBytes (Encoding.Latin1.GetBytes(string))
-        
-module HandshakeExtensions =
-    type IConnection with
-        member __.WriteHandshake(handshake: Handshake, ?timeout: int) =
-            __.Stream.WriteTimeout <- defaultArg timeout Handshake.DefaultWriteTimeoutMillis
-            Handshake.write __.Writer handshake
-        member __.ReadHandshake(?timeout: int) =
-            __.Stream.ReadTimeout <- defaultArg timeout Handshake.DefaultReadTimeoutMillis
-            Handshake.read __.Reader
+
+    let createConnection (connection: IConnection) =
+        { new IHandshakeConnection with
+            member _.Connection with get() = connection
+            member _.WriteHandshake(handshake: Handshake) =
+                connection.Stream.WriteTimeout <- DefaultWriteTimeoutMillis
+                write connection.Writer handshake
+            member _.ReadHandshake() =
+                connection.Stream.ReadTimeout <- DefaultReadTimeoutMillis
+                read connection.Reader
+            member _.Dispose() = connection.Dispose() }
+    
+    let tcpConnect endpoint = Connection.tcpConnect endpoint |> createConnection    
