@@ -34,11 +34,9 @@ type AnnouncerTests() =
             |> BEncode.defaultToBytes
         Announcer.actorFn call mailbox
 
-    let [<Literal>] Announce = "https://torrent.ubuntu.com/announce" 
+    let announceCommand = Announcer.Announce (Constants.Announce, [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None)
     
-    let announceCommand = Announcer.Announce (Announce, [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None)
-    
-    let scheduleAnnounceCommand = Announcer.ScheduleAnnounce (Announce, [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None, 0)
+    let scheduleAnnounceCommand = Announcer.ScheduleAnnounce (Constants.Announce, [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None, 0)
     
     let assertSuccess (commandResult: Announcer.CommandResult) =
         match commandResult with

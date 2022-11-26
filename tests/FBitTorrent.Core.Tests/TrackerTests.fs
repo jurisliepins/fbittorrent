@@ -1,5 +1,6 @@
 ﻿namespace FBitTorrent.Core.Tests
 
+open System
 open System.Net
 open System.Text
 open Xunit
@@ -9,50 +10,31 @@ open FBitTorrent.Core
 module TrackerTests =
     open FBitTorrent.Core.Tracker
   
-    [<Fact>]
-    let ``Test tracker announce success with peer list not compact`` () =
-        let call _ =
-            let peer =
-                (BValue.bdict (
-                    Map.empty
-                       .Add(BValue.bstr "ip", BValue.bstr "77.183.59.233")
-                       .Add(BValue.bstr "peer id", BValue.bstr "-TR3000-8bvvpy39oirv")
-                       .Add(BValue.bstr "port", BValue.bint 54412L)))
-            let response = 
-                Map.empty
-                    .Add(BValue.bstr "interval", BValue.bint 1800L)
-                    .Add(BValue.bstr "peers", BValue.blist [peer])
-            response
-            |> BValue.bdict
-            |> BEncode.defaultToBytes
-        let response =
-            defaultAnnounce
-                Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
-        Assert.Equal(None, response.Complete)
-        Assert.Equal(None, response.Incomplete)
-        Assert.Equal(1800L, response.Interval)
-        Assert.Equal(None, response.MinInterval)
-        Assert.Equal(1, response.Peers.Length)
-        Assert.Equal(IPAddress.Parse "77.183.59.233", response.Peers.Head.Address)
-        Assert.Equal(54412, response.Peers.Head.Port)
-        Assert.Equal(None, response.TrackerId)
-        Assert.Equal(None, response.WarningMessage)
-        
-    [<Fact>]
-    let ``Test tracker announce success with peer list compact`` () =
-        let call _ =
-            let peer =
-                [| 5uy; 18uy; 147uy; 143uy; 236uy; 30uy |]
-            let response =
-                Map.empty
-                    .Add(BValue.bstr "interval", BValue.bint 1800L)
-                    .Add(BValue.bstr "peers", BValue.bstr (Encoding.Latin1.GetString(peer)) )
-            response
-            |> BValue.bdict
-            |> BEncode.defaultToBytes
-        let response =
-            defaultAnnounce
-                Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
+    let PeerNotCompact =
+        (BValue.bdict (
+            Map.empty
+               .Add(BValue.bstr "ip", BValue.bstr "5.18.147.143")
+               .Add(BValue.bstr "peer id", BValue.bstr "-TR3000-8bvvpy39oirv")
+               .Add(BValue.bstr "port", BValue.bint 60446L)))
+    
+    let PeerCompact =
+        [| 5uy; 18uy; 147uy; 143uy; 236uy; 30uy |]
+    
+    let NotCompactResponse =
+        Map.empty
+            .Add(BValue.bstr "interval", BValue.bint 1800L)
+            .Add(BValue.bstr "peers", BValue.blist [PeerNotCompact])
+    
+    let CompactResponse =
+        Map.empty
+            .Add(BValue.bstr "interval", BValue.bint 1800L)
+            .Add(BValue.bstr "peers", BValue.bstr (Encoding.Latin1.GetString(PeerCompact)) )
+    
+    let FailureResponse =
+        Map.empty
+            .Add(BValue.bstr "failure reason", BValue.bstr "Test failure")
+    
+    let assertTrackerResponse (response: Response) =
         Assert.Equal(None, response.Complete)
         Assert.Equal(None, response.Incomplete)
         Assert.Equal(1800L, response.Interval)
@@ -62,20 +44,30 @@ module TrackerTests =
         Assert.Equal(60446, response.Peers.Head.Port)
         Assert.Equal(None, response.TrackerId)
         Assert.Equal(None, response.WarningMessage)
+    
+    [<Fact>]
+    let ``Test tracker announce success with peer list not compact`` () =
+        let call _ =
+            NotCompactResponse
+            |> BValue.bdict
+            |> BEncode.defaultToBytes
+        let response = defaultAnnounce Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
+        assertTrackerResponse response
+        
+    [<Fact>]
+    let ``Test tracker announce success with peer list compact`` () =
+        let call _ =
+            CompactResponse
+            |> BValue.bdict
+            |> BEncode.defaultToBytes
+        let response = defaultAnnounce Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
+        assertTrackerResponse response
             
     [<Fact>]
     let ``Test tracker announce failure`` () =
         let call _ =
-            let response = 
-                Map.empty
-                    .Add(BValue.bstr "failure reason", BValue.bstr "Test failure")
-            response
+            FailureResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
-        try
-            defaultAnnounce
-                Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
-            |> ignore
-            Assert.False(true, "Tracker should have responded with a failure response")
-        with exn ->
-            Assert.Equal(exn.Message, "Server responded with failure reason - Test failure")
+        Assert.ThrowsAny<Exception>(fun () ->
+            defaultAnnounce Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call |> ignore)
