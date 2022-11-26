@@ -11,9 +11,9 @@ open Xunit
 type AnnouncerTests() = 
     inherit TestKit()
 
-    let successAnnouncerName = "success-announcer"
+    let [<Literal>] SuccessAnnouncerName = "success-announcer"
     
-    let failureAnnouncerName = "failure-announcer"
+    let [<Literal>] FailureAnnouncerName = "failure-announcer"
     
     let successAnnouncerFn mailbox =
         let call _ =
@@ -33,13 +33,15 @@ type AnnouncerTests() =
             |> BValue.bdict
             |> BEncode.defaultToBytes
         Announcer.actorFn call mailbox
+
+    let [<Literal>] Announce = "https://torrent.ubuntu.com/announce" 
     
-    [<Fact>]
-    member __. ``Test should announce succeed`` () =
-        let announcerRef = spawn __.Sys successAnnouncerName successAnnouncerFn
-        let command = Announcer.Announce (
-            "https://torrent.ubuntu.com/announce", [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None)
-        match announcerRef.Ask(command, TimeSpan.FromSeconds 3) |> Async.RunSynchronously with
+    let announceCommand = Announcer.Announce (Announce, [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None)
+    
+    let scheduleAnnounceCommand = Announcer.ScheduleAnnounce (Announce, [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None, 0)
+    
+    let assertSuccess (commandResult: Announcer.CommandResult) =
+        match commandResult with
         | Announcer.Success (complete, incomplete, interval, peers, eventOpt) ->
             Assert.Equal(Some 1330L, complete)
             Assert.Equal(Some 20L, incomplete)
@@ -48,42 +50,35 @@ type AnnouncerTests() =
             Assert.Equal(Some Tracker.Event.Started, eventOpt)
         | Announcer.Failure _ ->
             Assert.False(true, "Announce should have succeeded")
-        
-    [<Fact>]
-    member __. ``Test should announce fail`` () =
-        let announcerRef = spawn __.Sys failureAnnouncerName failureAnnouncerFn
-        let command = Announcer.Announce (
-            "https://torrent.ubuntu.com/announce", [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None)
-        match announcerRef.Ask<Announcer.CommandResult>(command, TimeSpan.FromSeconds 3) |> Async.RunSynchronously with
+    
+    let assertFailure (commandResult: Announcer.CommandResult) =
+        match commandResult with
         | Announcer.Success _ ->
             Assert.False(true, "Should have failed to announce")
         | Announcer.Failure (exn, eventOpt) ->
             Assert.Equal("Failed to announce", exn.Message)
-            Assert.Equal((Some Tracker.Started), eventOpt) 
+            Assert.Equal((Some Tracker.Started), eventOpt)
         
     [<Fact>]
-    member __. ``Test should schedule announce succeed`` () =
-        let announcerRef = spawn __.Sys successAnnouncerName successAnnouncerFn
-        let command = Announcer.ScheduleAnnounce (
-            "https://torrent.ubuntu.com/announce", [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None, 0)
-        match announcerRef.Ask(command, TimeSpan.FromSeconds 3) |> Async.RunSynchronously with
-        | Announcer.Success (complete, incomplete, interval, peers, eventOpt) ->
-            Assert.Equal(Some 1330L, complete)
-            Assert.Equal(Some 20L, incomplete)
-            Assert.Equal(0L, interval)
-            Assert.Equal<IEnumerable>([], peers)
-            Assert.Equal(Some Tracker.Event.Started, eventOpt)
-        | Announcer.Failure _ ->
-            Assert.False(true, "Announce should have succeeded")
+    member __.``Test should announce succeed`` () =
+        let announcerRef = spawn __.Sys SuccessAnnouncerName successAnnouncerFn
+        let announcerCommandResult = announcerRef.Ask(announceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
+        assertSuccess announcerCommandResult
         
     [<Fact>]
-    member __. ``Test should schedule announce fail`` () =
-        let announcerRef = spawn __.Sys failureAnnouncerName failureAnnouncerFn
-        let command = Announcer.ScheduleAnnounce (
-            "https://torrent.ubuntu.com/announce", [||], [||], 0, 0L, 0L, 0L, (Some Tracker.Event.Started), None, 0)
-        match announcerRef.Ask<Announcer.CommandResult>(command, TimeSpan.FromSeconds 3) |> Async.RunSynchronously with
-        | Announcer.Success _ ->
-            Assert.False(true, "Should have failed")
-        | Announcer.Failure (exn, eventOpt) ->
-            Assert.Equal("Failed to announce", exn.Message)
-            Assert.Equal((Some Tracker.Started), eventOpt)        
+    member __.``Test should announce fail`` () =
+        let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
+        let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(announceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
+        assertFailure announcerCommandResult 
+        
+    [<Fact>]
+    member __.``Test should schedule announce succeed`` () =
+        let announcerRef = spawn __.Sys SuccessAnnouncerName successAnnouncerFn
+        let announcerCommandResult = announcerRef.Ask(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
+        assertSuccess announcerCommandResult
+        
+    [<Fact>]
+    member __.``Test should schedule announce fail`` () =
+        let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
+        let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
+        assertFailure announcerCommandResult       
