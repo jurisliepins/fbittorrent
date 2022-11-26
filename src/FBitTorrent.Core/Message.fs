@@ -111,8 +111,8 @@ type IMessageConnection =
 module Message =
     type Connect = IPEndPoint -> IMessageConnection
 
-    let DefaultWriteTimeoutMillis = 120_000
-    let DefaultReadTimeoutMillis = 120_000
+    let [<Literal>] DefaultWriteTimeoutMillis = 120_000
+    let [<Literal>] DefaultReadTimeoutMillis = 120_000
     
     let rec write (writer: ConnectionWriter) (message: Message) =
         match message with
@@ -228,7 +228,9 @@ module Message =
     and private readPiece reader length =
         let idx = reader.ReadInt32()
         let beg = reader.ReadInt32()
-        // TODO: Optimize how we read bytes. Right now GC is having to work hard to clear all this up.
+        // TODO:
+        //      Optimize how we read bytes. Right now GC is having to work hard to clear all this up.
+        //      One option is to read into a pooled buffer that can be cleaned up by the consumer of the message.  
         let block = reader.ReadBytes(length - 1 - 8) 
         PieceMessage (idx, beg, block)
     and private readCancel reader =

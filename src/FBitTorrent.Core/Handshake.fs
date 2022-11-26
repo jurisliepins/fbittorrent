@@ -23,18 +23,18 @@ type IHandshakeConnection =
 module Handshake =
     type Connect = IPEndPoint -> IHandshakeConnection
     
-    let ProtocolBytes = [| 66uy; 105uy; 116uy; 84uy; 111uy; 114uy; 114uy; 101uy; 110uy; 116uy; 32uy;
+    let protocolBytes = [| 66uy; 105uy; 116uy; 84uy; 111uy; 114uy; 114uy; 101uy; 110uy; 116uy; 32uy;
                             112uy; 114uy; 111uy; 116uy; 111uy; 99uy; 111uy; 108uy |]
-    let ReservedBytes = [| 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; |]
+    let reservedBytes = [| 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; |]
 
-    let DefaultWriteTimeoutMillis = 5_000
-    let DefaultReadTimeoutMillis = 5_000
+    let [<Literal>] DefaultWriteTimeoutMillis = 5_000
+    let [<Literal>] DefaultReadTimeoutMillis = 5_000
     
     let create (proto: byte[]) (res: byte[]) (ih: byte[]) (pid: byte[]) =
         Handshake (proto, res, ih, pid)
     
     let defaultCreate (ih: byte[]) (pid: byte[]) =
-        create ProtocolBytes ReservedBytes ih pid
+        create protocolBytes reservedBytes ih pid
         
     let write (writer: ConnectionWriter) (Handshake (proto, res, ih, pid): Handshake) =
         writer.Write(proto.Length |> byte)

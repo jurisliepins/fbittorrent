@@ -10,27 +10,27 @@ open FBitTorrent.Core
 module TrackerTests =
     open FBitTorrent.Core.Tracker
   
-    let PeerNotCompact =
+    let peerNotCompact =
         (BValue.bdict (
             Map.empty
                .Add(BValue.bstr "ip", BValue.bstr "5.18.147.143")
                .Add(BValue.bstr "peer id", BValue.bstr "-TR3000-8bvvpy39oirv")
                .Add(BValue.bstr "port", BValue.bint 60446L)))
     
-    let PeerCompact =
+    let peerCompact =
         [| 5uy; 18uy; 147uy; 143uy; 236uy; 30uy |]
     
-    let NotCompactResponse =
+    let notCompactResponse =
         Map.empty
             .Add(BValue.bstr "interval", BValue.bint 1800L)
-            .Add(BValue.bstr "peers", BValue.blist [PeerNotCompact])
+            .Add(BValue.bstr "peers", BValue.blist [peerNotCompact])
     
-    let CompactResponse =
+    let compactResponse =
         Map.empty
             .Add(BValue.bstr "interval", BValue.bint 1800L)
-            .Add(BValue.bstr "peers", BValue.bstr (Encoding.Latin1.GetString(PeerCompact)) )
+            .Add(BValue.bstr "peers", BValue.bstr (Encoding.Latin1.GetString(peerCompact)) )
     
-    let FailureResponse =
+    let failureResponse =
         Map.empty
             .Add(BValue.bstr "failure reason", BValue.bstr "Test failure")
     
@@ -48,7 +48,7 @@ module TrackerTests =
     [<Fact>]
     let ``Test tracker announce success with peer list not compact`` () =
         let call _ =
-            NotCompactResponse
+            notCompactResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
         let response = defaultAnnounce Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
@@ -57,7 +57,7 @@ module TrackerTests =
     [<Fact>]
     let ``Test tracker announce success with peer list compact`` () =
         let call _ =
-            CompactResponse
+            compactResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
         let response = defaultAnnounce Constants.Announce [||] [||] 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
@@ -66,7 +66,7 @@ module TrackerTests =
     [<Fact>]
     let ``Test tracker announce failure`` () =
         let call _ =
-            FailureResponse
+            failureResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
         Assert.ThrowsAny<Exception>(fun () ->

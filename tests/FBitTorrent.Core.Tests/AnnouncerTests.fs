@@ -12,7 +12,6 @@ type AnnouncerTests() =
     inherit TestKit()
 
     let [<Literal>] SuccessAnnouncerName = "success-announcer"
-    
     let [<Literal>] FailureAnnouncerName = "failure-announcer"
     
     let successAnnouncerFn mailbox =
@@ -53,11 +52,11 @@ type AnnouncerTests() =
     
     let assertFailure (commandResult: Announcer.CommandResult) =
         match commandResult with
-        | Announcer.Success _ ->
-            Assert.False(true, "Should have failed to announce")
         | Announcer.Failure (exn, eventOpt) ->
             Assert.Equal("Failed to announce", exn.Message)
             Assert.Equal((Some Tracker.Started), eventOpt)
+        | Announcer.Success _ ->
+            Assert.False(true, "Announce should have failed")
         
     [<Fact>]
     member __.``Test should announce succeed`` () =

@@ -4,16 +4,16 @@ open System.IO
 open FBitTorrent.Core
 
 module Constants =
-    let Announce = "https://torrent.ubuntu.com/announce"
+    let [<Literal>] Announce = "https://torrent.ubuntu.com/announce"
     
-    let SingleFileMetaInfoPath = "./single_file.torrent"
-    let MultiFileMetaInfoPath = "./multi_file.torrent"
+    let [<Literal>] SingleFileMetaInfoPath = "./single_file.torrent"
+    let [<Literal>] MultiFileMetaInfoPath = "./multi_file.torrent"
     
-    let SingleFileTorrentPath = "./war_and_peace.txt"
-    let MultiFileTorrentPath1 = "./war_and_peace/file_1.txt"
-    let MultiFileTorrentPath2 = "./war_and_peace/file_2.txt"
-    let MultiFileTorrentPath3 = "./war_and_peace/file_3.txt"
-    let MultiFileTorrentPath4 = "./war_and_peace/file_4.txt"
+    let [<Literal>] SingleFileTorrentPath = "./war_and_peace.txt"
+    let [<Literal>] MultiFileTorrentPath1 = "./war_and_peace/file_1.txt"
+    let [<Literal>] MultiFileTorrentPath2 = "./war_and_peace/file_2.txt"
+    let [<Literal>] MultiFileTorrentPath3 = "./war_and_peace/file_3.txt"
+    let [<Literal>] MultiFileTorrentPath4 = "./war_and_peace/file_4.txt"
     
     let SingleFileMetaInfoBytes = File.ReadAllBytes(SingleFileMetaInfoPath)
     let MultiFileMetaInfoBytes  = File.ReadAllBytes(MultiFileMetaInfoPath)
