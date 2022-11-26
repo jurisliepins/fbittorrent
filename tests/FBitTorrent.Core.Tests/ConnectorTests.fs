@@ -61,7 +61,8 @@ type ConnectorTests() =
         let connect _ = failureHandshakeConnection
         Connector.actorFn connect mailbox
     
-    let connectCommand = Connector.Connect (IPAddress.Loopback, 0, Handshake.defaultCreate (Encoding.Latin1.GetBytes("")) (Encoding.Latin1.GetBytes("")))
+    let connectCommand =
+        Connector.Connect (IPAddress.Loopback, 0, Handshake.defaultCreate (Encoding.Latin1.GetBytes("")) (Encoding.Latin1.GetBytes("")))
     
     let assertSuccess (commandResult: Connector.CommandResult) =
         match commandResult with

@@ -72,12 +72,8 @@ module Handshake =
     let createConnection (connection: IConnection) =
         { new IHandshakeConnection with
             member _.Connection with get() = connection
-            member _.WriteHandshake(handshake: Handshake) =
-                connection.Stream.WriteTimeout <- DefaultWriteTimeoutMillis
-                write connection.Writer handshake
-            member _.ReadHandshake() =
-                connection.Stream.ReadTimeout <- DefaultReadTimeoutMillis
-                read connection.Reader
+            member _.WriteHandshake(handshake: Handshake) = write connection.Writer handshake
+            member _.ReadHandshake() = read connection.Reader
             member _.Dispose() = connection.Dispose() }
     
     let tcpConnect endpoint = Connection.tcpConnect endpoint |> createConnection    

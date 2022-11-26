@@ -1,6 +1,8 @@
 namespace FBitTorrent.Core
 
+open System
 open System.IO
+open System.Net
 open System.Text
 
 type MessageType =
@@ -100,7 +102,14 @@ with
         | CancelMessage   (idx, beg, length) -> $"Cancel(index=%d{idx},begin=%d{beg},length=%d{length})"
         | PortMessage     port               -> $"Port(listenPort=%d{port})"
 
+type IMessageConnection =
+    inherit IDisposable
+    abstract member Connection: IConnection with get
+    abstract member WriteMessage: Message -> unit
+    abstract member ReadMessage: unit -> Message
+
 module Message =
+    type Connect = IPEndPoint -> IMessageConnection
 
     let DefaultWriteTimeoutMillis = 120_000
     let DefaultReadTimeoutMillis = 120_000
@@ -247,12 +256,12 @@ module Message =
         
     let fromString (string: string) =
         fromBytes (Encoding.Latin1.GetBytes(string))
-        
-module MessageExtensions =
-    type IConnection with
-        member __.WriteMessage(message: Message, ?timeout: int) =
-            __.Stream.WriteTimeout <- defaultArg timeout Message.DefaultWriteTimeoutMillis
-            Message.write __.Writer message
-        member __.ReadMessage(?timeout: int) =
-            __.Stream.ReadTimeout <- defaultArg timeout Message.DefaultReadTimeoutMillis 
-            Message.read __.Reader
+
+    let createConnection (connection: IConnection) =
+        { new IMessageConnection with
+            member _.Connection with get() = connection
+            member _.WriteMessage(message: Message) = write connection.Writer message
+            member _.ReadMessage() = read connection.Reader
+            member _.Dispose() = connection.Dispose() }
+    
+    let tcpConnect endpoint = Connection.tcpConnect endpoint |> createConnection
