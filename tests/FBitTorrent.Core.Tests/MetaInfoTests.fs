@@ -11,48 +11,48 @@ module MetaInfoTests =
     let assertDecodedSingleFileMetaInfo (mi: MetaInfo) =
         match mi.Info with
         | SingleFileInfo info ->
-            Assert.Equal<Hash>(Constants.SingleFileMetaInfoHash, (singleFileInfoHash info))
+            Assert.Equal<Hash>(Constants.singleFileMetaInfoHash, (singleFileInfoHash info))
         | _ ->
             Assert.False(true, "Should have been single file info")
     
     let assertDecodedMultiFileMetaInfo (mi: MetaInfo) =
         match mi.Info with
         | MultiFileInfo info ->
-            Assert.Equal<Hash>(Constants.MultiFileMetaInfoHash, (multiFileInfoHash info))
+            Assert.Equal<Hash>(Constants.multiFileMetaInfoHash, (multiFileInfoHash info))
         | _ ->
             Assert.False(true, "Should have been multi file info")
     
     [<Fact>]
     let ``Test decode single file info and hash from bytes`` () =
-        let mi = fromBytes Constants.SingleFileMetaInfoBytes
+        let mi = fromBytes Constants.singleFileMetaInfoBytes
         assertDecodedSingleFileMetaInfo mi
 
     [<Fact>]
     let ``Test decode single file info and hash from stream`` () =
-        let mi = fromStream (new MemoryStream(Constants.SingleFileMetaInfoBytes))
+        let mi = fromStream (new MemoryStream(Constants.singleFileMetaInfoBytes))
         assertDecodedSingleFileMetaInfo mi
 
     [<Fact>]
     let ``Test decode single file info and hash from string`` () =
-        let mi = fromString (Encoding.Latin1.GetString(Constants.SingleFileMetaInfoBytes))
+        let mi = fromString (Encoding.Latin1.GetString(Constants.singleFileMetaInfoBytes))
         assertDecodedSingleFileMetaInfo mi
 
     [<Fact>]
     let ``Test encode/decode single file UTF-8 info from string`` () =
         let info =
-            match Constants.SingleFileMetaInfo.Info with
+            match Constants.singleFileMetaInfo.Info with
             | SingleFileInfo info ->
                 { info with Name = "Название" } |> SingleFileInfo
             | MultiFileInfo _ ->
                 failwith "Expected single-file info"
         let mi = 
-            { Constants.SingleFileMetaInfo with
+            { Constants.singleFileMetaInfo with
                 Info      = info 
                 Comment   = Some "Комментарий"
                 CreatedBy = Some "Пользователь" }
         let mi =
             fromString (toString mi)
-        match Constants.SingleFileMetaInfo.Info, mi.Info with
+        match Constants.singleFileMetaInfo.Info, mi.Info with
         |  SingleFileInfo exp, SingleFileInfo act ->
             Assert.Equal(exp.Length, act.Length)
             Assert.Equal(exp.MD5Sum, act.MD5Sum)
@@ -61,34 +61,34 @@ module MetaInfoTests =
             for p1, p2 in Array.zip act.Pieces exp.Pieces do
                 Assert.Equal(p1, p2)
             Assert.Equal(exp.Private, act.Private)
-            Assert.Equal(Constants.SingleFileMetaInfo.Announce, mi.Announce)
-            Assert.Equal(Constants.SingleFileMetaInfo.AnnounceList, mi.AnnounceList)
+            Assert.Equal(Constants.singleFileMetaInfo.Announce, mi.Announce)
+            Assert.Equal(Constants.singleFileMetaInfo.AnnounceList, mi.AnnounceList)
             Assert.Equal("Комментарий", mi.Comment.Value)
             Assert.Equal("Пользователь", mi.CreatedBy.Value)
-            Assert.Equal(Constants.SingleFileMetaInfo.CreationDate, mi.CreationDate)
-            Assert.Equal(Constants.SingleFileMetaInfo.Encoding, mi.Encoding)
+            Assert.Equal(Constants.singleFileMetaInfo.CreationDate, mi.CreationDate)
+            Assert.Equal(Constants.singleFileMetaInfo.Encoding, mi.Encoding)
         | _ ->
             Assert.False(true, "Should have been single file info")
     
     [<Fact>]
     let ``Test decode multi file info and hash from bytes`` () =
-        let mi = fromBytes Constants.MultiFileMetaInfoBytes
+        let mi = fromBytes Constants.multiFileMetaInfoBytes
         assertDecodedMultiFileMetaInfo mi
 
     [<Fact>]
     let ``Test decode multi file info and hash from stream`` () =
-        let mi = fromStream (new MemoryStream(Constants.MultiFileMetaInfoBytes))
+        let mi = fromStream (new MemoryStream(Constants.multiFileMetaInfoBytes))
         assertDecodedMultiFileMetaInfo mi
 
     [<Fact>]
     let ``Test decode multi file info and hash from string`` () =
-        let mi = fromString (Encoding.Latin1.GetString(Constants.MultiFileMetaInfoBytes))
+        let mi = fromString (Encoding.Latin1.GetString(Constants.multiFileMetaInfoBytes))
         assertDecodedMultiFileMetaInfo mi
             
     [<Fact>]
     let ``Test encode/decode multi file UTF-8 info from string`` () =
         let info =
-            match Constants.MultiFileMetaInfo.Info with
+            match Constants.multiFileMetaInfo.Info with
             | SingleFileInfo _ ->
                 failwith "Expected multi-file info"
             | MultiFileInfo info ->
@@ -101,13 +101,13 @@ module MetaInfoTests =
                     Files = info.Files |> List.map mapFile }
                 |> MultiFileInfo
         let mi = 
-            { Constants.MultiFileMetaInfo with
+            { Constants.multiFileMetaInfo with
                 Info      = info 
                 Comment   = Some "Комментарий"
                 CreatedBy = Some "Пользователь" }
         let mi =
             fromString (toString mi)
-        match Constants.MultiFileMetaInfo.Info, mi.Info with
+        match Constants.multiFileMetaInfo.Info, mi.Info with
         |  MultiFileInfo exp, MultiFileInfo act ->
             Assert.Equal(exp.PieceLength, act.PieceLength)
             for p1, p2 in Array.zip act.Pieces exp.Pieces do
@@ -119,11 +119,11 @@ module MetaInfoTests =
                 |> List.iteri (fun idx path -> Assert.Equal($"%d{idx} - Путь", path))
             act.Files
             |> List.iter mapFile
-            Assert.Equal(Constants.MultiFileMetaInfo.Announce, mi.Announce)
-            Assert.Equal(Constants.MultiFileMetaInfo.AnnounceList, mi.AnnounceList)
+            Assert.Equal(Constants.multiFileMetaInfo.Announce, mi.Announce)
+            Assert.Equal(Constants.multiFileMetaInfo.AnnounceList, mi.AnnounceList)
             Assert.Equal("Комментарий", mi.Comment.Value)
             Assert.Equal("Пользователь", mi.CreatedBy.Value)
-            Assert.Equal(Constants.MultiFileMetaInfo.CreationDate, mi.CreationDate)
-            Assert.Equal(Constants.MultiFileMetaInfo.Encoding, mi.Encoding)
+            Assert.Equal(Constants.multiFileMetaInfo.CreationDate, mi.CreationDate)
+            Assert.Equal(Constants.multiFileMetaInfo.Encoding, mi.Encoding)
         | _ ->
             Assert.False(true, "Should have been multi file info")

@@ -7,8 +7,8 @@ open Xunit
 
 module FileSystemTests =
     
-    let [<Literal>] ValidFilePath = ".\\test.txt"
-    let [<Literal>] ValidDirPath = ".\\test"
+    let [<Literal>] ValidFilePath = "./test.txt"
+    let [<Literal>] ValidDirPath = "./test"
     
     let [<Literal>] InvalidFilePath = ""
     let [<Literal>] InvalidDirPath = ""

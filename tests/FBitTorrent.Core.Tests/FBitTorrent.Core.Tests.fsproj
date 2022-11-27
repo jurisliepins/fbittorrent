@@ -21,6 +21,7 @@
     <Compile Include="RateTests.fs" />
     <Compile Include="AnnouncerTests.fs" />
     <Compile Include="ConnectorTests.fs" />
+    <Compile Include="PiecesTests.fs" />
     <Compile Include="Program.fs" />
     <Content Include="single_file.torrent">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

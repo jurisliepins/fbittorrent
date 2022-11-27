@@ -19,6 +19,7 @@
     <Compile Include="Rate.fs" />
     <Compile Include="Announcer.fs" />
     <Compile Include="Connector.fs" />
+    <Compile Include="Pieces.fs" />
     <None Include="paket.references" />
   </ItemGroup>
   
