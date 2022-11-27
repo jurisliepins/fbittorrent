@@ -28,31 +28,3 @@ module RateTests =
         Assert.Equal(77.82000000000001, rate.GetSpeed())
         rate.Update(5225)
         Assert.Equal(45.7000, rate.GetSpeed())
-        
-    [<Fact>]
-    let ``Test rate should format bytes`` () =
-        let exp = "10.000 B/s"
-        let act = Rate()
-        act.Update(10L)                      
-        Assert.Equal(exp, act.ToString())
-        
-    [<Fact>]
-    let ``Test rate should format kilo-bytes`` () =
-        let exp = "10.000 KB/s"
-        let act = Rate()
-        act.Update(10L * 1024L)
-        Assert.Equal(exp, act.ToString())
-        
-    [<Fact>]
-    let ``Test rate should format mega-bytes`` () =
-        let exp = "10.000 MB/s"
-        let act = Rate()
-        act.Update(10L * 1024L * 1024L)
-        Assert.Equal(exp, act.ToString())
-        
-    [<Fact>]
-    let ``Test rate should format giga-bytes`` () =
-        let exp = "10.000 GB/s"
-        let act = Rate()
-        act.Update(10L * 1024L * 1024L * 1024L)
-        Assert.Equal(exp, act.ToString())
