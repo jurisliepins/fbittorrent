@@ -355,13 +355,13 @@ module MetaInfo =
             failwith $"Invalid encoded MetaInfo - expected %A{BDictionaryType} and got %A{value}"
     
     let fromStream (value: Stream) =
-        fromBValue (BDecode.defaultFromStream value)
+        fromBValue (BDecode.fromStream Encoding.Latin1 value)
     
     let fromBytes (value: byte[]) =
-        fromBValue (BDecode.defaultFromBytes value)
+        fromBValue (BDecode.fromBytes Encoding.Latin1 value)
 
     let fromString (value: string) =
-        fromBValue (BDecode.defaultFromString value)
+        fromBValue (BDecode.fromString Encoding.Latin1 value)
 
     let toBValue (mi: MetaInfo) =
         Map.empty
@@ -370,15 +370,15 @@ module MetaInfo =
 
     let toStream (mi: MetaInfo) =
         toBValue mi
-        |> BEncode.defaultToStream
+        |> BEncode.toStream Encoding.Latin1
     
     let toBytes (mi: MetaInfo) =
         toBValue mi
-        |> BEncode.defaultToBytes
+        |> BEncode.toBytes Encoding.Latin1
     
     let toString (mi: MetaInfo) =
         toBValue mi
-        |> BEncode.defaultToString
+        |> BEncode.toString Encoding.Latin1
     
     let singleFileInfoHash (info: SingleFileInfo) =
         Map.empty
@@ -389,7 +389,7 @@ module MetaInfo =
         |> packPrivate info.Private
         |> packMD5Sum info.MD5Sum
         |> BValue.bdict
-        |> BEncode.defaultToBytes
+        |> BEncode.toBytes Encoding.Latin1
         |> Hash.ComputeBlock
 
     let multiFileInfoHash (info: MultiFileInfo) =
@@ -400,7 +400,7 @@ module MetaInfo =
         |> packName info.Name
         |> packPrivate info.Private
         |> BValue.bdict
-        |> BEncode.defaultToBytes
+        |> BEncode.toBytes Encoding.Latin1
         |> Hash.ComputeBlock
 
     let infoHash (info: Info) =
