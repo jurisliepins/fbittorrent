@@ -25,6 +25,7 @@ type AnnouncerTests() =
             |> BEncode.defaultToBytes
         Announcer.actorFn call mailbox
         
+        
     let failureAnnouncerFn mailbox =
         let call _ =
             Map.empty
@@ -59,25 +60,25 @@ type AnnouncerTests() =
             Assert.False(true, "Announce should have failed")
         
     [<Fact>]
-    member __.``Test should announce succeed`` () =
+    member __.``Test should announce succeed``() =
         let announcerRef = spawn __.Sys SuccessAnnouncerName successAnnouncerFn
         let announcerCommandResult = announcerRef.Ask(announceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertSuccess announcerCommandResult
         
     [<Fact>]
-    member __.``Test should announce fail`` () =
+    member __.``Test should announce fail``() =
         let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
         let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(announceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertFailure announcerCommandResult 
         
     [<Fact>]
-    member __.``Test should schedule announce succeed`` () =
+    member __.``Test should schedule announce succeed``() =
         let announcerRef = spawn __.Sys SuccessAnnouncerName successAnnouncerFn
         let announcerCommandResult = announcerRef.Ask(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertSuccess announcerCommandResult
         
     [<Fact>]
-    member __.``Test should schedule announce fail`` () =
+    member __.``Test should schedule announce fail``() =
         let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
         let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertFailure announcerCommandResult
