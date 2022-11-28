@@ -28,7 +28,6 @@ type CircularBuffer<'a>(capacity: int) =
         member __.GetEnumerator() = new CircularBufferEnumerator<'a>(__)
             
 and CircularBufferEnumerator<'a>(buffer: CircularBuffer<'a>) =
-    
     member val private Current = Unchecked.defaultof<'a> with get, set
     member val private Index = 0 with get, set
     
