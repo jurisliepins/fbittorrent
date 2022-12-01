@@ -38,7 +38,7 @@ module BigEndianConverter =
 type ConnectionReader(stream: Stream) =
     inherit BinaryReader(stream)
 
-    member private _.ReadNBytes(count: int) =
+    member private _.ReadCountBytes(count: int) =
         let bytes = base.ReadBytes count
         if bytes.Length = 0 then
             failwith "Encountered end of stream - connection closed at the other end"
@@ -46,46 +46,43 @@ type ConnectionReader(stream: Stream) =
             bytes
 
     override __.ReadInt16() =
-        BigEndianConverter.toInt16 (__.ReadNBytes(sizeof<int16>))
+        BigEndianConverter.toInt16 (__.ReadCountBytes(sizeof<int16>))
 
     override __.ReadUInt16() =
-        BigEndianConverter.toUInt16 (__.ReadNBytes(sizeof<uint16>))
+        BigEndianConverter.toUInt16 (__.ReadCountBytes(sizeof<uint16>))
 
     override __.ReadInt32() =
-        BigEndianConverter.toInt32 (__.ReadNBytes(sizeof<int32>))
+        BigEndianConverter.toInt32 (__.ReadCountBytes(sizeof<int32>))
 
     override __.ReadUInt32() =
-        BigEndianConverter.toUInt32 (__.ReadNBytes(sizeof<uint32>))
+        BigEndianConverter.toUInt32 (__.ReadCountBytes(sizeof<uint32>))
 
     override __.ReadInt64() =
-        BigEndianConverter.toInt64 (__.ReadNBytes(sizeof<int64>))
+        BigEndianConverter.toInt64 (__.ReadCountBytes(sizeof<int64>))
 
     override __.ReadUInt64() =
-        BigEndianConverter.toUInt64 (__.ReadNBytes(sizeof<uint64>))
+        BigEndianConverter.toUInt64 (__.ReadCountBytes(sizeof<uint64>))
 
 type ConnectionWriter(stream: Stream) =
     inherit BinaryWriter(stream)
 
-    member private _.WriteNBytes(bytes: byte[]) =
-        base.Write(bytes)
+    override _.Write(value: int16) =
+        base.Write(BigEndianConverter.fromInt16(value))
 
-    override __.Write(value: int16) =
-        __.WriteNBytes(BigEndianConverter.fromInt16(value))
+    override _.Write(value: uint16) =
+        base.Write(BigEndianConverter.fromUInt16(value))
 
-    override __.Write(value: uint16) =
-        __.WriteNBytes(BigEndianConverter.fromUInt16(value))
+    override _.Write(value: int32) =
+        base.Write(BigEndianConverter.fromInt32(value))
 
-    override __.Write(value: int32) =
-        __.WriteNBytes(BigEndianConverter.fromInt32(value))
+    override _.Write(value: uint32) =
+        base.Write(BigEndianConverter.fromUInt32(value))
 
-    override __.Write(value: uint32) =
-        __.WriteNBytes(BigEndianConverter.fromUInt32(value))
+    override _.Write(value: int64) =
+        base.Write(BigEndianConverter.fromInt64(value))
 
-    override __.Write(value: int64) =
-        __.WriteNBytes(BigEndianConverter.fromInt64(value))
-
-    override __.Write(value: uint64) =
-        __.WriteNBytes(BigEndianConverter.fromUInt64(value))
+    override _.Write(value: uint64) =
+        base.Write(BigEndianConverter.fromUInt64(value))
 
 type IConnection =
     inherit IDisposable
