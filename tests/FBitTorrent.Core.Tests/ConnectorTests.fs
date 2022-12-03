@@ -80,13 +80,13 @@ type ConnectorTests() =
             Assert.False(true, "Connect should have failed")
     
     [<Fact>]
-    member __. ``Test should connect succeed`` () =
+    member __. ``Test should connect succeed``() =
         let connectorRef = spawn __.Sys SuccessConnectorName successConnectorFn
         let connectorCommandResult = connectorRef.Ask<Connector.CommandResult>(connectCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertSuccess connectorCommandResult
         
     [<Fact>]
-    member __. ``Test should connect fail`` () =
+    member __. ``Test should connect fail``() =
         let connectorRef = spawn __.Sys FailureConnectorName failureConnectorFn
         let connectorCommandResult = connectorRef.Ask<Connector.CommandResult>(connectCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertFailure connectorCommandResult
