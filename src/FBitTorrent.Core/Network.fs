@@ -38,30 +38,31 @@ module BigEndianConverter =
 type ConnectionReader(stream: Stream) =
     inherit BinaryReader(stream)
 
-    member private _.ReadCountBytes(count: int) =
-        let bytes = base.ReadBytes count
-        if bytes.Length = 0 then
-            failwith "Encountered end of stream - connection closed at the other end"
-        else
-            bytes
+    member private _.ReadBytesExact(count: int) =
+        match base.ReadBytes(count) with
+        | bytes when bytes.Length = 0 && count <> 0 ->
+            failwith "Read 0 bytes indicating end of stream (connection closed at the other end)"
+        | bytes when bytes.Length <> count ->
+            failwith $"Read %d{bytes.Length} bytes instead of %d{count} expected"
+        | bytes -> bytes
 
     override __.ReadInt16() =
-        BigEndianConverter.toInt16 (__.ReadCountBytes(sizeof<int16>))
+        BigEndianConverter.toInt16 (__.ReadBytesExact(sizeof<int16>))
 
     override __.ReadUInt16() =
-        BigEndianConverter.toUInt16 (__.ReadCountBytes(sizeof<uint16>))
+        BigEndianConverter.toUInt16 (__.ReadBytesExact(sizeof<uint16>))
 
     override __.ReadInt32() =
-        BigEndianConverter.toInt32 (__.ReadCountBytes(sizeof<int32>))
+        BigEndianConverter.toInt32 (__.ReadBytesExact(sizeof<int32>))
 
     override __.ReadUInt32() =
-        BigEndianConverter.toUInt32 (__.ReadCountBytes(sizeof<uint32>))
+        BigEndianConverter.toUInt32 (__.ReadBytesExact(sizeof<uint32>))
 
     override __.ReadInt64() =
-        BigEndianConverter.toInt64 (__.ReadCountBytes(sizeof<int64>))
+        BigEndianConverter.toInt64 (__.ReadBytesExact(sizeof<int64>))
 
     override __.ReadUInt64() =
-        BigEndianConverter.toUInt64 (__.ReadCountBytes(sizeof<uint64>))
+        BigEndianConverter.toUInt64 (__.ReadBytesExact(sizeof<uint64>))
 
 type ConnectionWriter(stream: Stream) =
     inherit BinaryWriter(stream)
