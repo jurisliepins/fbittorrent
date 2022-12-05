@@ -1,5 +1,6 @@
 namespace FBitTorrent.Core
 
+open System
 open System.Collections.Generic
 open System.IO
 open System.Linq
@@ -123,3 +124,16 @@ module Pieces =
               Pieces        = piecesFromMultiFileInfo outputDir mfi
               DownRate      = Rate()
               UpRate        = Rate() }
+    
+    module ByteBuffer =
+        let create capacity =
+            Array.create capacity 0uy
+        
+        let copy (blocks: byte[][]) (buffer: byte[]) =
+            let folder (offset: int) (block: byte[]) =
+                Array.Copy(block, 0, buffer, offset, block.Length)
+                offset + block.Length
+            blocks |> Array.fold folder 0
+            
+        let tryCopy (blocks: byte[][]) (buffer: byte[]) =
+            try Ok(copy blocks buffer) with exn -> Error exn

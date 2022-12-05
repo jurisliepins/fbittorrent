@@ -1,5 +1,6 @@
 namespace FBitTorrent.Core.Tests
 
+open System
 open System.Linq
 open Akka.TestKit.Xunit2
 open FBitTorrent.Core
@@ -25,7 +26,7 @@ type PiecesTests() =
             failwith "Should have loaded multi file torrent"
     
     [<Fact>]
-    member _.``Test should create pieces state from single file info`` () =
+    member _.``Test should create pieces state from single file info``() =
         let state = createSingleFilePiecesState ()
         Assert.Equal<Pieces.Status>(Pieces.Stopped, state.Status)
         Assert.Equal<int64>(0L, state.Downloaded)
@@ -59,11 +60,11 @@ type PiecesTests() =
                 Assert.Equal<string>(Constants.SingleFileTorrentPath, files.First().Path)
                 Assert.Equal<int64>(0L, files.First().Offset)
                 Assert.Equal<int64>(Constants.singleFileInfo.Length, files.First().Length)
-        Assert.Equal<Rate>(Rate(), state.DownRate)
-        Assert.Equal<Rate>(Rate(), state.UpRate)
+        Assert.Equal(0.0, state.DownRate.GetSpeed())
+        Assert.Equal(0.0, state.UpRate.GetSpeed())
         
     [<Fact>]
-    member _.``Test should create pieces state from multi file info`` () =
+    member _.``Test should create pieces state from multi file info``() =
         let state = createMultiFilePiecesState ()
         Assert.Equal<Pieces.Status>(Pieces.Stopped, state.Status)
         Assert.Equal<int64>(0L, state.Downloaded)
@@ -74,6 +75,7 @@ type PiecesTests() =
         Assert.Equal<string>(OutputDir, state.OutputDir)
         Assert.Equal<string[]>([| Constants.multiFileInfo.Name |], state.OutputSubDirs)
         Assert.Equal<int64>(Constants.multiFileInfo.Files.Sum(fun file -> int64 file.Length), state.Pieces.Values.Sum(fun piece -> int64 piece.Length))
+        // TODO: Check pieces and files correctness in a more generic way. Right now the values are hardcoded.
         match state.Pieces[0] with
         | { Index  = index
             Hash   = hash
@@ -109,5 +111,34 @@ type PiecesTests() =
             Assert.Equal(Constants.MultiFileTorrentPath4, files[0].Path)
             Assert.Equal(28356L, files[0].Offset)
             Assert.Equal(8180L, files[0].Length)
-        Assert.Equal<Rate>(Rate(), state.DownRate)
-        Assert.Equal<Rate>(Rate(), state.UpRate)
+        Assert.Equal(0.0, state.DownRate.GetSpeed())
+        Assert.Equal(0.0, state.UpRate.GetSpeed())
+        
+    [<Fact>]
+    member _.``Test should piece buffer copy blocks success``() =
+        let buffer = Pieces.ByteBuffer.create 100
+        let copiedCount = Pieces.ByteBuffer.copy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer
+        Assert.Equal(50, copiedCount)
+        
+    [<Fact>]
+    member _.``Test should piece buffer copy blocks failure``() =
+        Assert.ThrowsAny<Exception>(fun () ->
+            let buffer = Pieces.ByteBuffer.create 100
+            let copiedCount = Pieces.ByteBuffer.copy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer
+            ())
+        
+    [<Fact>]
+    member _.``Test should piece buffer try copy blocks success``() =
+        let buffer = Pieces.ByteBuffer.create 100
+        match Pieces.ByteBuffer.tryCopy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer with
+        | Error _ ->
+            Assert.True(false, "Buffer copy should have succeed")
+        | _ -> ()
+        
+    [<Fact>]
+    member _.``Test should piece buffer try copy blocks failure``() =
+        let buffer = Pieces.ByteBuffer.create 100
+        match Pieces.ByteBuffer.tryCopy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer with
+        | Ok _ ->
+            Assert.True(false, "Buffer copy should have failed")
+        | _ -> ()
