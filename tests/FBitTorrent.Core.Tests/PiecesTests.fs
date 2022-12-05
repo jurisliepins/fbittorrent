@@ -115,20 +115,20 @@ type PiecesTests() =
         Assert.Equal(0.0, state.UpRate.GetSpeed())
         
     [<Fact>]
-    member _.``Test should piece buffer copy blocks success``() =
+    member _.``Test should byte buffer copy blocks success``() =
         let buffer = Pieces.ByteBuffer.create 100
         let copiedCount = Pieces.ByteBuffer.copy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer
         Assert.Equal(50, copiedCount)
         
     [<Fact>]
-    member _.``Test should piece buffer copy blocks failure``() =
+    member _.``Test should byte buffer copy blocks failure``() =
         Assert.ThrowsAny<Exception>(fun () ->
             let buffer = Pieces.ByteBuffer.create 100
             let copiedCount = Pieces.ByteBuffer.copy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer
             ())
         
     [<Fact>]
-    member _.``Test should piece buffer try copy blocks success``() =
+    member _.``Test should byte buffer try copy blocks success``() =
         let buffer = Pieces.ByteBuffer.create 100
         match Pieces.ByteBuffer.tryCopy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer with
         | Error _ ->
@@ -136,7 +136,7 @@ type PiecesTests() =
         | _ -> ()
         
     [<Fact>]
-    member _.``Test should piece buffer try copy blocks failure``() =
+    member _.``Test should byte buffer try copy blocks failure``() =
         let buffer = Pieces.ByteBuffer.create 100
         match Pieces.ByteBuffer.tryCopy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer with
         | Ok _ ->
