@@ -255,12 +255,17 @@ module Pieces =
                 | Start ->
                     match state with
                     | { Status = Stopped } ->
-                        let nextState = { state with
-                                            Status   = Started
-                                            DownRate = Rate()
-                                            UpRate   = Rate() }
-                        notifiedRef <! StateChanged (NotificationState.Create(nextState))
-                        receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                        match FileSystemIO.tryWriteDirTree fs state.OutputDir state.OutputSubDirs with
+                        | Ok _ ->
+                            let nextState = { state with
+                                                Status   = Started
+                                                DownRate = Rate()
+                                                UpRate   = Rate() }
+                            notifiedRef <! StateChanged (NotificationState.Create(nextState))
+                            receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                        | Error exn ->
+                            notifiedRef <! DirTreeWriteFailure (Exception("Failed to setup output directory tree", exn))
+                            receive pieceBuffer cleanBitfield dirtyBitfield state
                     | _ ->
                         receive pieceBuffer cleanBitfield dirtyBitfield state
                 | Stop ->
