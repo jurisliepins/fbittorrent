@@ -1,7 +1,9 @@
 namespace FBitTorrent.Core.Tests
 
 open System
+open System.IO
 open System.Linq
+open Akka.FSharp
 open Akka.TestKit.Xunit2
 open FBitTorrent.Core
 open Xunit
@@ -10,6 +12,7 @@ type PiecesTests() =
     inherit TestKit()
     
     let [<Literal>] OutputDir = "./"
+    let [<Literal>] PiecesName = "pieces"
     
     let createSingleFilePiecesState () =
         match Constants.singleFileMetaInfo.Info with
@@ -25,6 +28,20 @@ type PiecesTests() =
         | _ ->
             failwith "Should have loaded multi file torrent"
 
+    let successFileSystem =
+        { new IFileSystem with
+            member _.FileExists(path: string) = true
+            member _.DirectoryExists(path: string) = true
+            member _.OpenOrCreate(path: string) = new MemoryStream() :> Stream
+            member _.CreateDirectory(path: string) = () }
+    
+    let failureFileSystem =
+        { new IFileSystem with
+            member _.FileExists(path: string) = failwith "File system failed"
+            member _.DirectoryExists(path: string) = failwith "File system failed"
+            member _.OpenOrCreate(path: string) = failwith "File system failed"
+            member _.CreateDirectory(path: string) = failwith "File system failed" }
+    
     [<Fact>]
     member _.``Test should byte buffer copy blocks success``() =
         let buffer = ByteBuffer.create 100
@@ -167,3 +184,24 @@ type PiecesTests() =
     member _.``Test should file system write dir failure``() =
         // TODO: Add!
         ()
+    
+    member __.``Test should change status successfully``(initialState: Pieces.State, command: Pieces.Command, expectedStatus: Pieces.Status) =
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys PiecesName (Pieces.actorFn successFileSystem notifiedRef initialState)
+        piecesRef.Tell(command, __.CreateTestProbe())
+        notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = expectedStatus
+                                                                 Downloaded = initialState.Downloaded
+                                                                 Uploaded   = initialState.Uploaded
+                                                                 Left       = initialState.Left }) |> ignore
+       
+    [<Fact>]
+    member __.``Test should change start status successfully``() =
+        let initialState = createSingleFilePiecesState ()
+        let initialState = { initialState with Status = Pieces.Status.Stopped }
+        __.``Test should change status successfully``(initialState, Pieces.Command.Start, Pieces.Status.Started)
+        
+    [<Fact>]
+    member __.``Test should change stop status successfully``() =
+        let initialState = createSingleFilePiecesState ()
+        let initialState = { initialState with Status = Pieces.Status.Started }
+        __.``Test should change status successfully``(initialState, Pieces.Command.Stop, Pieces.Status.Stopped)

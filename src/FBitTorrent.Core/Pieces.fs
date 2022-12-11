@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.IO
 open System.Linq
+open Akka.FSharp.Actors
 open FBitTorrent.Core
 
 type ByteBuffer = byte[]
@@ -189,3 +190,104 @@ module Pieces =
             
         let tryWriteDirTree (fs: IFileSystem) (outputDir: string) (outputSubDirs: string[]) =
             try Ok (writeDirTree fs outputDir outputSubDirs) with exn -> Error exn
+    
+    type private RateCommand = MeasureRate
+            
+    type Command =
+        | Start
+        | Stop
+    
+    type Request =
+        | SelfBitfield
+        | LeechPiece   of Bitfield
+        
+    type Response =
+        | SelfBitfield of Bitfield
+        | LeechPiece   of int * int
+    
+    type Message =
+        | LeechSuccess of int * byte[][]
+        | LeechFailure of int * Exception
+    
+    type NotificationState =
+        { Status:     Status
+          Downloaded: int64
+          Uploaded:   int64
+          Left:       int64 }
+    with
+        static member Create(state: State) =
+            { Status     = state.Status
+              Downloaded = state.Downloaded
+              Uploaded   = state.Uploaded
+              Left       = state.Left }
+    
+    type Notification =
+        | StateChanged        of NotificationState
+        | DirTreeWriteFailure of Exception
+        | PieceLeechSuccess   of int
+        | PieceLeechFailure   of int * Exception
+        | PieceWriteSuccess   of int
+        | PieceWriteFailure   of int * Exception
+        
+    let actorName () = "pieces"
+    
+    let actorFn fs notifiedRef initialState (mailbox: Actor<obj>) =
+        let rec receive (pieceBuffer: ByteBuffer) (cleanBitfield: Bitfield) (dirtyBitfield: Bitfield) (state: State) = actor {
+            match! mailbox.Receive() with
+            | :? Command as command ->
+                return! handleCommand pieceBuffer cleanBitfield dirtyBitfield state command
+
+            | :? RateCommand ->
+                return! handleRateCommand pieceBuffer cleanBitfield dirtyBitfield state
+                        
+            | :? Message as message ->
+                return! handleMessage pieceBuffer cleanBitfield dirtyBitfield state message
+            
+            | :? Request as request ->
+                return! handleRequest pieceBuffer cleanBitfield dirtyBitfield state request
+
+            | message ->
+                mailbox.Unhandled message
+                return! receive pieceBuffer cleanBitfield dirtyBitfield state }
+
+            and handleCommand pieceBuffer cleanBitfield dirtyBitfield (state: State) command =
+                match command with
+                | Start ->
+                    match state with
+                    | { Status = Stopped } ->
+                        let nextState = { state with
+                                            Status   = Started
+                                            DownRate = Rate()
+                                            UpRate   = Rate() }
+                        notifiedRef <! StateChanged (NotificationState.Create(nextState))
+                        receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                    | _ ->
+                        receive pieceBuffer cleanBitfield dirtyBitfield state
+                | Stop ->
+                    match state with
+                    | { Status = Started } ->
+                        let nextState = { state with
+                                            Status   = Stopped
+                                            DownRate = Rate()
+                                            UpRate   = Rate() }
+                        notifiedRef <! StateChanged (NotificationState.Create(nextState))
+                        receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                    | _ ->
+                        receive pieceBuffer cleanBitfield dirtyBitfield state
+
+            and handleRateCommand pieceBuffer cleanBitfield dirtyBitfield (state: State) =
+                receive pieceBuffer cleanBitfield dirtyBitfield state
+                        
+            and handleMessage pieceBuffer cleanBitfield dirtyBitfield (state: State) message =
+                receive pieceBuffer cleanBitfield dirtyBitfield state
+            
+            and handleRequest pieceBuffer cleanBitfield dirtyBitfield (state: State) request =
+                receive pieceBuffer cleanBitfield dirtyBitfield state
+
+        let pieceBuffer = ByteBuffer.create initialState.PieceLength
+        let cleanBitfield = Bitfield(initialState.Bitfield).Not()
+        let dirtyBitfield = Bitfield(initialState.Bitfield.Capacity)
+        receive pieceBuffer cleanBitfield dirtyBitfield initialState
+    
+    let defaultActorFn notifiedRef initialState mailbox =
+        actorFn (FileSystem.createLocal ()) notifiedRef initialState mailbox

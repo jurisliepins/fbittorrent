@@ -11,8 +11,7 @@ open Xunit
 type AnnouncerTests() = 
     inherit TestKit()
 
-    let [<Literal>] SuccessAnnouncerName = "success-announcer"
-    let [<Literal>] FailureAnnouncerName = "failure-announcer"
+    let [<Literal>] AnnouncerName = "announcer"
     
     let successAnnouncerFn mailbox =
         let call _ =
@@ -60,24 +59,24 @@ type AnnouncerTests() =
         
     [<Fact>]
     member __.``Test should announce succeed``() =
-        let announcerRef = spawn __.Sys SuccessAnnouncerName successAnnouncerFn
+        let announcerRef = spawn __.Sys AnnouncerName successAnnouncerFn
         let announcerCommandResult = announcerRef.Ask(announceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertSuccess announcerCommandResult
         
     [<Fact>]
     member __.``Test should announce fail``() =
-        let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
+        let announcerRef = spawn __.Sys AnnouncerName failureAnnouncerFn
         let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(announceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertFailure announcerCommandResult 
         
     [<Fact>]
     member __.``Test should schedule announce succeed``() =
-        let announcerRef = spawn __.Sys SuccessAnnouncerName successAnnouncerFn
+        let announcerRef = spawn __.Sys AnnouncerName successAnnouncerFn
         let announcerCommandResult = announcerRef.Ask(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertSuccess announcerCommandResult
         
     [<Fact>]
     member __.``Test should schedule announce fail``() =
-        let announcerRef = spawn __.Sys FailureAnnouncerName failureAnnouncerFn
+        let announcerRef = spawn __.Sys AnnouncerName failureAnnouncerFn
         let announcerCommandResult = announcerRef.Ask<Announcer.CommandResult>(scheduleAnnounceCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertFailure announcerCommandResult
