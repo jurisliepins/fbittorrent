@@ -6,8 +6,21 @@ open System.IO
 open System.Linq
 open FBitTorrent.Core
 
-module Pieces =
+type ByteBuffer = byte[]
     
+module ByteBuffer =
+    let create (capacity: int) : ByteBuffer = Array.create capacity 0uy
+    
+    let copy (blocks: byte[][]) (buffer: byte[]) =
+        let folder (offset: int) (block: byte[]) =
+            Array.Copy(block, 0, buffer, offset, block.Length)
+            offset + block.Length
+        blocks |> Array.fold folder 0
+        
+    let tryCopy (blocks: byte[][]) (buffer: byte[]) =
+        try Ok(copy blocks buffer) with exn -> Error exn
+
+module Pieces =
     type File =
         { Path:   string 
           Offset: int64
@@ -124,25 +137,9 @@ module Pieces =
               Pieces        = piecesFromMultiFileInfo outputDir mfi
               DownRate      = Rate()
               UpRate        = Rate() }
-    
-    type ByteBuffer = byte[]
-    
-    module ByteBuffer =
-        let create (capacity: int) : ByteBuffer = Array.create capacity 0uy
-        
-        let copy (blocks: byte[][]) (buffer: byte[]) =
-            let folder (offset: int) (block: byte[]) =
-                Array.Copy(block, 0, buffer, offset, block.Length)
-                offset + block.Length
-            blocks |> Array.fold folder 0
             
-        let tryCopy (blocks: byte[][]) (buffer: byte[]) =
-            try Ok(copy blocks buffer) with exn -> Error exn
-            
-    module ByteBufferIO =
-        let inline private writeStream
-            (stream: Stream) (soffset: int64) (slength: int64)
-            (buffer: ByteBuffer) (boffset: int64) (blength: int64) =
+    module FileSystemIO =
+        let inline private writeStream (stream: Stream) (soffset: int64) (slength: int64) (buffer: ByteBuffer) (boffset: int64) (blength: int64) =
             if slength > stream.Length then 
                 stream.SetLength(slength)
             stream.Seek(soffset, SeekOrigin.Begin) |> ignore

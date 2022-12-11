@@ -49,25 +49,24 @@ and CircularBufferEnumerator<'a>(buffer: CircularBuffer<'a>) =
                 
         member _.Reset() = index <- 0
 
-module Rate =
+type Rate() =
     let [<Literal>] Smoothing = 0.02
     let [<Literal>] Capacity = 5
-
-type Rate() =
-    let byteCounts = CircularBuffer(Rate.Capacity)
+    
+    let byteDeltas = CircularBuffer(Capacity)
     let mutable byteCount = 0L
     
     member _.Update(updatedByteCount: int64) =
-        byteCounts.Push(updatedByteCount - byteCount)
+        byteDeltas.Push(updatedByteCount - byteCount)
         byteCount <- updatedByteCount
 
     member _.GetSpeed() =
-        if byteCounts.Count < 1 then
+        if byteDeltas.Count < 1 then
             double 0.0
         else
-            let last = double (byteCounts.Last())
-            let total = double (byteCounts.Sum())
-            let count = double byteCounts.Count
+            let last = double (byteDeltas.Last())
+            let total = double (byteDeltas.Sum())
+            let count = double byteDeltas.Count
             let average = total / count
             // Exponential moving average to smooth out the result.
-            double ((Rate.Smoothing * last) + ((1.0 - Rate.Smoothing) * average))
+            double ((Smoothing * last) + ((1.0 - Smoothing) * average))

@@ -25,7 +25,6 @@ type AnnouncerTests() =
             |> BEncode.defaultToBytes
         Announcer.actorFn call mailbox
         
-        
     let failureAnnouncerFn mailbox =
         let call _ =
             Map.empty

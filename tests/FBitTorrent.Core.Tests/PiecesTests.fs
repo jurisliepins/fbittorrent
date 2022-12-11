@@ -24,7 +24,36 @@ type PiecesTests() =
             Pieces.createStateFromInfo OutputDir (info |> MultiFileInfo)
         | _ ->
             failwith "Should have loaded multi file torrent"
-    
+
+    [<Fact>]
+    member _.``Test should byte buffer copy blocks success``() =
+        let buffer = ByteBuffer.create 100
+        let copiedCount = ByteBuffer.copy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer
+        Assert.Equal(50, copiedCount)
+        
+    [<Fact>]
+    member _.``Test should byte buffer copy blocks failure``() =
+        Assert.ThrowsAny<Exception>(fun () ->
+            let buffer = ByteBuffer.create 100
+            let copiedCount = ByteBuffer.copy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer
+            ())
+        
+    [<Fact>]
+    member _.``Test should byte buffer try copy blocks success``() =
+        let buffer = ByteBuffer.create 100
+        match ByteBuffer.tryCopy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer with
+        | Error _ ->
+            Assert.True(false, "Buffer copy should have succeed")
+        | _ -> ()
+        
+    [<Fact>]
+    member _.``Test should byte buffer try copy blocks failure``() =
+        let buffer = ByteBuffer.create 100
+        match ByteBuffer.tryCopy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer with
+        | Ok _ ->
+            Assert.True(false, "Buffer copy should have failed")
+        | _ -> ()
+        
     [<Fact>]
     member _.``Test should create pieces state from single file info``() =
         let state = createSingleFilePiecesState ()
@@ -113,32 +142,28 @@ type PiecesTests() =
             Assert.Equal(8180L, files[0].Length)
         Assert.Equal(0.0, state.DownRate.GetSpeed())
         Assert.Equal(0.0, state.UpRate.GetSpeed())
+
+    [<Fact>]
+    member _.``Test should file system write single file torrent success``() =
+        // TODO: Add!
+        ()
         
     [<Fact>]
-    member _.``Test should byte buffer copy blocks success``() =
-        let buffer = Pieces.ByteBuffer.create 100
-        let copiedCount = Pieces.ByteBuffer.copy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer
-        Assert.Equal(50, copiedCount)
+    member _.``Test should file system write multi file torrent success``() =
+        // TODO: Add!
+        ()
         
     [<Fact>]
-    member _.``Test should byte buffer copy blocks failure``() =
-        Assert.ThrowsAny<Exception>(fun () ->
-            let buffer = Pieces.ByteBuffer.create 100
-            let copiedCount = Pieces.ByteBuffer.copy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer
-            ())
+    member _.``Test should file system write torrent failure``() =
+        // TODO: Add!
+        ()
         
     [<Fact>]
-    member _.``Test should byte buffer try copy blocks success``() =
-        let buffer = Pieces.ByteBuffer.create 100
-        match Pieces.ByteBuffer.tryCopy ((Array.create 50 0uy).Chunk(10).ToArray()) buffer with
-        | Error _ ->
-            Assert.True(false, "Buffer copy should have succeed")
-        | _ -> ()
+    member _.``Test should file system write dir success``() =
+        // TODO: Add!
+        ()
         
     [<Fact>]
-    member _.``Test should byte buffer try copy blocks failure``() =
-        let buffer = Pieces.ByteBuffer.create 100
-        match Pieces.ByteBuffer.tryCopy ((Array.create 200 0uy).Chunk(10).ToArray()) buffer with
-        | Ok _ ->
-            Assert.True(false, "Buffer copy should have failed")
-        | _ -> ()
+    member _.``Test should file system write dir failure``() =
+        // TODO: Add!
+        ()
