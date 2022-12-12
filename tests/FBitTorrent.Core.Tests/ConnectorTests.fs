@@ -12,8 +12,6 @@ open Xunit
 type ConnectorTests() = 
     inherit TestKit()
 
-    let [<Literal>] ConnectorName = "connector"
-    
     let successConnection =
         { new IConnection with
             member _.Stream with get() = new MemoryStream() 
@@ -80,12 +78,12 @@ type ConnectorTests() =
     
     [<Fact>]
     member __. ``Test should connect succeed``() =
-        let connectorRef = spawn __.Sys ConnectorName successConnectorFn
+        let connectorRef = spawn __.Sys (Connector.actorName ()) successConnectorFn
         let connectorCommandResult = connectorRef.Ask<Connector.CommandResult>(connectCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertSuccess connectorCommandResult
         
     [<Fact>]
     member __. ``Test should connect fail``() =
-        let connectorRef = spawn __.Sys ConnectorName failureConnectorFn
+        let connectorRef = spawn __.Sys (Connector.actorName ()) failureConnectorFn
         let connectorCommandResult = connectorRef.Ask<Connector.CommandResult>(connectCommand, TimeSpan.FromSeconds 3) |> Async.RunSynchronously
         assertFailure connectorCommandResult

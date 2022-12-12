@@ -12,7 +12,6 @@ type PiecesTests() =
     inherit TestKit()
     
     let [<Literal>] OutputDir = "./"
-    let [<Literal>] PiecesName = "pieces"
     
     let createSingleFilePiecesState () =
         match Constants.singleFileMetaInfo.Info with
@@ -187,7 +186,7 @@ type PiecesTests() =
     
     member __.``Test should change status success``(initialState: Pieces.State, command: Pieces.Command, expectedStatus: Pieces.Status) =
         let notifiedRef = __.CreateTestProbe()
-        let piecesRef = spawn __.Sys PiecesName (Pieces.actorFn successFileSystem notifiedRef initialState)
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
         piecesRef.Tell(command, __.CreateTestProbe())
         notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = expectedStatus
                                                                  Downloaded = initialState.Downloaded
@@ -210,7 +209,7 @@ type PiecesTests() =
         
     member __.``Test should write directory tree``(initialState: Pieces.State, fs: IFileSystem, expectedNotification: Pieces.Notification) =
         let notifiedRef = __.CreateTestProbe()
-        let piecesRef = spawn __.Sys PiecesName (Pieces.actorFn fs notifiedRef initialState)
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn fs notifiedRef initialState)
         piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
         match expectedNotification with
         | Pieces.Notification.StateChanged _ ->
