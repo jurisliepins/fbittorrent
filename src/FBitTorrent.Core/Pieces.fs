@@ -191,11 +191,10 @@ module Pieces =
         let tryWriteDirTree (fs: IFileSystem) (outputDir: string) (outputSubDirs: string[]) =
             try Ok (writeDirTree fs outputDir outputSubDirs) with exn -> Error exn
     
-    type private RateCommand = MeasureRate
-            
     type Command =
         | Start
         | Stop
+        | UpdateRates
     
     type Request =
         | SelfBitfield
@@ -213,13 +212,17 @@ module Pieces =
         { Status:     Status
           Downloaded: int64
           Uploaded:   int64
-          Left:       int64 }
+          Left:       int64
+          DownSpeed:   double
+          UpSpeed:     double }
     with
         static member Create(state: State) =
             { Status     = state.Status
               Downloaded = state.Downloaded
               Uploaded   = state.Uploaded
-              Left       = state.Left }
+              Left       = state.Left
+              DownSpeed  = state.DownRate.GetSpeed()
+              UpSpeed    = state.UpRate.GetSpeed() }
     
     type Notification =
         | StateChanged        of NotificationState
@@ -237,9 +240,6 @@ module Pieces =
             | :? Command as command ->
                 return! handleCommand pieceBuffer cleanBitfield dirtyBitfield state command
 
-            | :? RateCommand ->
-                return! handleRateCommand pieceBuffer cleanBitfield dirtyBitfield state
-                        
             | :? Message as message ->
                 return! handleMessage pieceBuffer cleanBitfield dirtyBitfield state message
             
@@ -262,6 +262,7 @@ module Pieces =
                                                 DownRate = Rate()
                                                 UpRate   = Rate() }
                             notifiedRef <! StateChanged (NotificationState.Create(nextState))
+                            mailbox.Self <! Command.UpdateRates
                             receive pieceBuffer cleanBitfield dirtyBitfield nextState
                         | Error exn ->
                             notifiedRef <! DirTreeWriteFailure (Exception("Failed to setup output directory tree", exn))
@@ -279,10 +280,17 @@ module Pieces =
                         receive pieceBuffer cleanBitfield dirtyBitfield nextState
                     | _ ->
                         receive pieceBuffer cleanBitfield dirtyBitfield state
+                | UpdateRates ->
+                    match state with
+                    | { Status = Started } when mailbox.Context.Sender.Equals(mailbox.Context.Self) ->
+                        state.DownRate.Update(state.Downloaded)
+                        state.UpRate.Update(state.Uploaded)
+                        notifiedRef <! StateChanged (NotificationState.Create(state))
+                        mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(float 1.0f), mailbox.Self, Command.UpdateRates)
+                        receive pieceBuffer cleanBitfield dirtyBitfield state 
+                    | _ ->
+                        receive pieceBuffer cleanBitfield dirtyBitfield state
 
-            and handleRateCommand pieceBuffer cleanBitfield dirtyBitfield (state: State) =
-                receive pieceBuffer cleanBitfield dirtyBitfield state
-                        
             and handleMessage pieceBuffer cleanBitfield dirtyBitfield (state: State) message =
                 receive pieceBuffer cleanBitfield dirtyBitfield state
             

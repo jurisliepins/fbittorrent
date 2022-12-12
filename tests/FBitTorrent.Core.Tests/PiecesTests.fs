@@ -192,7 +192,9 @@ type PiecesTests() =
         notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = expectedStatus
                                                                  Downloaded = initialState.Downloaded
                                                                  Uploaded   = initialState.Uploaded
-                                                                 Left       = initialState.Left }) |> ignore
+                                                                 Left       = initialState.Left
+                                                                 DownSpeed  = 0.0
+                                                                 UpSpeed    = 0.0 }) |> ignore
        
     [<Fact>]
     member __.``Test should change start status success``() =
@@ -231,7 +233,9 @@ type PiecesTests() =
             Pieces.Notification.StateChanged { Status     = Pieces.Status.Started
                                                Downloaded = initialState.Downloaded
                                                Uploaded   = initialState.Uploaded
-                                               Left       = initialState.Left })
+                                               Left       = initialState.Left
+                                               DownSpeed  = 0.0
+                                               UpSpeed    = 0.0 })
         
     [<Fact>]
     member __.``Test should write directory tree failure``() =
