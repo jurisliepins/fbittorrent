@@ -183,63 +183,74 @@ type PiecesTests() =
     member _.``Test should file system write dir failure``() =
         // TODO: Add!
         ()
-    
-    member __.``Test should change status success``(initialState: Pieces.State, command: Pieces.Command, expectedStatus: Pieces.Status) =
+
+    [<Fact>]
+    member __.``Test should notify start status change``() =
+        let initialState = createSingleFilePiecesState ()
+        let initialState = { initialState with Status = Pieces.Status.Stopped }
         let notifiedRef = __.CreateTestProbe()
         let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
-        piecesRef.Tell(command, __.CreateTestProbe())
-        notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = expectedStatus
+        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
+        notifiedRef.ExpectMsg(Pieces.Notification.DirTreeWriteSuccess) |> ignore
+        notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = Pieces.Status.Started
                                                                  Downloaded = initialState.Downloaded
                                                                  Uploaded   = initialState.Uploaded
                                                                  Left       = initialState.Left
                                                                  DownSpeed  = 0.0
                                                                  UpSpeed    = 0.0 }) |> ignore
-       
-    [<Fact>]
-    member __.``Test should change start status success``() =
-        let initialState = createSingleFilePiecesState ()
-        let initialState = { initialState with Status = Pieces.Status.Stopped }
-        __.``Test should change status success``(initialState, Pieces.Command.Start, Pieces.Status.Started)
         
     [<Fact>]
-    member __.``Test should change stop status success``() =
+    member __.``Test should notify stop status change``() =
         let initialState = createSingleFilePiecesState ()
         let initialState = { initialState with Status = Pieces.Status.Started }
-        __.``Test should change status success``(initialState, Pieces.Command.Stop, Pieces.Status.Stopped)
-        
-    member __.``Test should write directory tree``(initialState: Pieces.State, fs: IFileSystem, expectedNotification: Pieces.Notification) =
         let notifiedRef = __.CreateTestProbe()
-        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn fs notifiedRef initialState)
-        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
-        match expectedNotification with
-        | Pieces.Notification.StateChanged _ ->
-            notifiedRef.ExpectMsg<Pieces.Notification>(expectedNotification) |> ignore
-        | Pieces.Notification.DirTreeWriteFailure expected ->
-            let assertMessage (notification: Pieces.Notification) =
-                match notification with
-                | Pieces.Notification.DirTreeWriteFailure actual ->
-                    expected.Message.Equals(actual.Message)
-                | _ -> false
-            notifiedRef.ExpectMsg<Pieces.Notification>(assertMessage) |> ignore
-        | _ -> failwith "Unexpected notification"
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
+        piecesRef.Tell(Pieces.Command.Stop, __.CreateTestProbe())
+        notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = Pieces.Status.Stopped
+                                                                 Downloaded = initialState.Downloaded
+                                                                 Uploaded   = initialState.Uploaded
+                                                                 Left       = initialState.Left
+                                                                 DownSpeed  = 0.0
+                                                                 UpSpeed    = 0.0 }) |> ignore
         
     [<Fact>]
     member __.``Test should write directory tree success``() =
         let initialState = createSingleFilePiecesState ()
-        __.``Test should write directory tree``(
-            initialState,
-            successFileSystem,
-            Pieces.Notification.StateChanged { Status     = Pieces.Status.Started
-                                               Downloaded = initialState.Downloaded
-                                               Uploaded   = initialState.Uploaded
-                                               Left       = initialState.Left
-                                               DownSpeed  = 0.0
-                                               UpSpeed    = 0.0 })
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
+        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
+        notifiedRef.ExpectMsg<Pieces.Notification>(Pieces.Notification.DirTreeWriteSuccess) |> ignore
+        notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = Pieces.Status.Started
+                                                                 Downloaded = initialState.Downloaded
+                                                                 Uploaded   = initialState.Uploaded
+                                                                 Left       = initialState.Left
+                                                                 DownSpeed  = 0.0
+                                                                 UpSpeed    = 0.0 }) |> ignore
         
     [<Fact>]
     member __.``Test should write directory tree failure``() =
         let initialState = createSingleFilePiecesState ()
-        __.``Test should write directory tree``(
-            initialState,
-            failureFileSystem,
-            Pieces.Notification.DirTreeWriteFailure (Exception("Failed to setup output directory tree")))
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn failureFileSystem notifiedRef initialState)
+        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
+        notifiedRef.ExpectMsg<Pieces.Notification>(fun (notification: Pieces.Notification) ->
+            match notification with
+            | Pieces.Notification.DirTreeWriteFailure error ->
+                error.Message.Equals("Failed to setup output directory tree")
+            | _ -> false) |> ignore
+        
+    [<Fact>]
+    member __.``Test should notify piece write success on leech success``() =
+        ()
+        
+    [<Fact>]
+    member __.``Test should notify piece write failure on leech success``() =
+        ()
+        
+    [<Fact>]
+    member __.``Test should notify piece buffer copy failure on leech success``() =
+        ()
+        
+    [<Fact>]
+    member __.``Test should notify on leech failure``() =
+        ()

@@ -213,8 +213,8 @@ module Pieces =
           Downloaded: int64
           Uploaded:   int64
           Left:       int64
-          DownSpeed:   double
-          UpSpeed:     double }
+          DownSpeed:  double
+          UpSpeed:    double }
     with
         static member Create(state: State) =
             { Status     = state.Status
@@ -226,6 +226,7 @@ module Pieces =
     
     type Notification =
         | StateChanged        of NotificationState
+        | DirTreeWriteSuccess
         | DirTreeWriteFailure of Exception
         | PieceLeechSuccess   of int
         | PieceLeechFailure   of int * Exception
@@ -261,6 +262,7 @@ module Pieces =
                                                 Status   = Started
                                                 DownRate = Rate()
                                                 UpRate   = Rate() }
+                            notifiedRef <! DirTreeWriteSuccess
                             notifiedRef <! StateChanged (NotificationState.Create(nextState))
                             mailbox.Self <! Command.UpdateRates
                             receive pieceBuffer cleanBitfield dirtyBitfield nextState
@@ -292,7 +294,39 @@ module Pieces =
                         receive pieceBuffer cleanBitfield dirtyBitfield state
 
             and handleMessage pieceBuffer cleanBitfield dirtyBitfield (state: State) message =
-                receive pieceBuffer cleanBitfield dirtyBitfield state
+                match message with
+                | LeechSuccess (idx, blocks) ->
+                    match state.Pieces.TryGetValue(idx) with
+                    | true, piece when dirtyBitfield.Get(idx) ->
+                        if piece.Hash.Equals(Hash.ComputeBlocks(blocks)) then
+                            notifiedRef <! PieceLeechSuccess idx
+                            match ByteBuffer.tryCopy blocks pieceBuffer with
+                            | Ok length ->
+                                match FileSystemIO.tryWritePiece fs piece pieceBuffer with
+                                | Ok _ -> 
+                                    let nextState = { state with
+                                                        Downloaded = state.Downloaded + int64 length
+                                                        Left       = state.Left       - int64 length }
+                                    nextState.Bitfield.Set(idx, true)
+                                    dirtyBitfield.Set(idx, false)
+                                    notifiedRef <! PieceWriteSuccess idx
+                                    notifiedRef <! StateChanged (NotificationState.Create(nextState))
+                                    receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                                | Error error ->
+                                    notifiedRef <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", error))
+                                    receive pieceBuffer cleanBitfield dirtyBitfield state
+                            | Error error ->
+                                notifiedRef <! PieceWriteFailure (idx, Exception($"Failed to copy received blocks into the buffer for piece %d{idx}", error))
+                                receive pieceBuffer cleanBitfield dirtyBitfield state
+                        else
+                            receive pieceBuffer cleanBitfield dirtyBitfield state
+                    | _ ->
+                        receive pieceBuffer cleanBitfield dirtyBitfield state
+                | LeechFailure (idx, error)  ->
+                    match state.Pieces.TryGetValue(idx) with
+                    | true, _ when dirtyBitfield.Get(idx) -> notifiedRef <! PieceLeechFailure (idx, error)
+                    | _ -> () 
+                    receive pieceBuffer cleanBitfield dirtyBitfield state
             
             and handleRequest pieceBuffer cleanBitfield dirtyBitfield (state: State) request =
                 receive pieceBuffer cleanBitfield dirtyBitfield state
