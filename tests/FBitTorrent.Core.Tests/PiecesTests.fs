@@ -69,7 +69,27 @@ type PiecesTests() =
         | Ok _ ->
             Assert.True(false, "Buffer copy should have failed")
         | _ -> ()
+
+    [<Fact>]
+    member _.``Test should bitfields add``() =
+        // TODO: Add!
+        ()
         
+    [<Fact>]
+    member _.``Test should bitfields find first``() =
+        // TODO: Add!
+        ()
+        
+    [<Fact>]
+    member _.``Test should bitfields find rarest``() =
+        // TODO: Add!
+        ()
+          
+    [<Fact>]
+    member _.``Test should bitfields find``() =
+        // TODO: Add!
+        ()
+            
     [<Fact>]
     member _.``Test should create pieces state from single file info``() =
         let state = createSingleFilePiecesState ()
