@@ -190,7 +190,7 @@ type PiecesTests() =
         let initialState = { initialState with Status = Pieces.Status.Stopped }
         let notifiedRef = __.CreateTestProbe()
         let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
-        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
+        piecesRef.Tell(Pieces.Command.Start, notifiedRef)
         notifiedRef.ExpectMsg(Pieces.Notification.DirTreeWriteSuccess) |> ignore
         notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = Pieces.Status.Started
                                                                  Downloaded = initialState.Downloaded
@@ -205,7 +205,7 @@ type PiecesTests() =
         let initialState = { initialState with Status = Pieces.Status.Started }
         let notifiedRef = __.CreateTestProbe()
         let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
-        piecesRef.Tell(Pieces.Command.Stop, __.CreateTestProbe())
+        piecesRef.Tell(Pieces.Command.Stop, notifiedRef)
         notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = Pieces.Status.Stopped
                                                                  Downloaded = initialState.Downloaded
                                                                  Uploaded   = initialState.Uploaded
@@ -218,7 +218,7 @@ type PiecesTests() =
         let initialState = createSingleFilePiecesState ()
         let notifiedRef = __.CreateTestProbe()
         let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn successFileSystem notifiedRef initialState)
-        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
+        piecesRef.Tell(Pieces.Command.Start, notifiedRef)
         notifiedRef.ExpectMsg<Pieces.Notification>(Pieces.Notification.DirTreeWriteSuccess) |> ignore
         notifiedRef.ExpectMsg(Pieces.Notification.StateChanged { Status     = Pieces.Status.Started
                                                                  Downloaded = initialState.Downloaded
@@ -232,7 +232,7 @@ type PiecesTests() =
         let initialState = createSingleFilePiecesState ()
         let notifiedRef = __.CreateTestProbe()
         let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn failureFileSystem notifiedRef initialState)
-        piecesRef.Tell(Pieces.Command.Start, __.CreateTestProbe())
+        piecesRef.Tell(Pieces.Command.Start, notifiedRef)
         notifiedRef.ExpectMsg<Pieces.Notification>(fun (notification: Pieces.Notification) ->
             match notification with
             | Pieces.Notification.DirTreeWriteFailure error ->
@@ -241,16 +241,163 @@ type PiecesTests() =
         
     [<Fact>]
     member __.``Test should notify piece write success on leech success``() =
-        ()
+        let initialState = createSingleFilePiecesState ()
+        let stream = new MemoryStream()
+        let fileStream () = 
+            { new MemoryStream() with
+                member _.SetLength(count: int64) = ()
+                member _.Seek(offset: int64, origin: SeekOrigin) = offset
+                member _.Write(bytes: byte[], offset: int, count: int) = stream.Write(bytes, offset, count) }
+        let fileSystem =
+            { new IFileSystem with
+                    member _.FileExists(path: string) = true
+                    member _.DirectoryExists(path: string) = false
+                    member _.OpenOrCreate(path: string) = fileStream ()
+                    member _.CreateDirectory(path: string) = () }
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn fileSystem notifiedRef initialState)
+        let rec iterate (pieces: Pieces.Piece list) (state: Pieces.State) =
+            match pieces with
+            | [] -> ()
+            | piece::pieces' ->
+                let bitfield = Bitfield(initialState.Bitfield.Capacity)
+                bitfield.Set(Array.create (initialState.Bitfield.ToArray().Length) 0uy)
+                bitfield.Set(piece.Index, true)
+                piecesRef.Tell(Pieces.Request.LeechPiece bitfield, notifiedRef)
+                notifiedRef.ExpectMsg(Pieces.Response.LeechPiece ((piece.Index, piece.Length))) |> ignore
+                piecesRef.Tell(Pieces.LeechSuccess (piece.Index, Constants.singleFilePieces[piece.Index]
+                                                                 |> Array.chunkBySize Block.BlockLength), notifiedRef)
+                notifiedRef.ExpectMsg(Pieces.PieceLeechSuccess piece.Index) |> ignore
+                notifiedRef.ExpectMsg(Pieces.PieceWriteSuccess piece.Index) |> ignore
+                let nextState =
+                    { state with
+                        Downloaded = state.Downloaded + int64 piece.Length
+                        Left       = state.Left       - int64 piece.Length }
+                state.Bitfield.Set(piece.Index, true)
+                notifiedRef.ExpectMsg(Pieces.StateChanged (Pieces.NotificationState.Create(nextState))) |> ignore
+                iterate pieces' nextState
+        let pieces =
+            initialState.Pieces.ToArray()
+            |> Array.map (fun kv -> kv.Value)
+            |> Array.toList
+        iterate pieces initialState
+        let exp = Constants.singleFilePieces |> Array.concat
+        let act = stream.ToArray()
+        Assert.Equal<byte[]>(exp, act)
         
     [<Fact>]
     member __.``Test should notify piece write failure on leech success``() =
-        ()
+        let initialState = createSingleFilePiecesState ()
+        let fileStream () = 
+            { new MemoryStream() with
+                member _.SetLength(count: int64) = failwith "File stream failed"
+                member _.Seek(offset: int64, origin: SeekOrigin) = failwith "File stream failed"
+                member _.Write(bytes: byte[], offset: int, count: int) = failwith "File stream failed" }
+        let fileSystem =
+            { new IFileSystem with
+                    member _.FileExists(path: string) = true
+                    member _.DirectoryExists(path: string) = false
+                    member _.OpenOrCreate(path: string) = fileStream ()
+                    member _.CreateDirectory(path: string) = () }
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn fileSystem notifiedRef initialState)
+        let rec iterate (pieces: Pieces.Piece list) =
+            match pieces with
+            | [] -> ()
+            | piece::pieces' ->
+                let bitfield = Bitfield(initialState.Bitfield.Capacity)
+                bitfield.Set(Array.create (initialState.Bitfield.ToArray().Length) 0uy)
+                bitfield.Set(piece.Index, true)
+                piecesRef.Tell(Pieces.Request.LeechPiece bitfield, notifiedRef)
+                notifiedRef.ExpectMsg(Pieces.Response.LeechPiece ((piece.Index, piece.Length))) |> ignore
+                piecesRef.Tell(Pieces.LeechSuccess (piece.Index, Constants.singleFilePieces[piece.Index]
+                                                                 |> Array.chunkBySize Block.BlockLength), notifiedRef)
+                notifiedRef.ExpectMsg<Pieces.Notification>(Pieces.PieceLeechSuccess piece.Index) |> ignore
+                notifiedRef.ExpectMsg<Pieces.Notification>(fun (notification: Pieces.Notification) ->
+                    match notification with
+                    | Pieces.Notification.PieceWriteFailure (idx, error) -> error.Message.Equals($"Failed to write piece %d{idx}")
+                    | _ -> false) |> ignore
+                iterate pieces'
+        let pieces =
+            initialState.Pieces.ToArray()
+            |> Array.map (fun kv -> kv.Value)
+            |> Array.toList
+        iterate pieces
         
     [<Fact>]
     member __.``Test should notify piece buffer copy failure on leech success``() =
-        ()
+        let initialState = createSingleFilePiecesState ()
+        let initialState = { initialState with PieceLength = 0 }
+        let fileStream () = 
+            { new MemoryStream() with
+                member _.SetLength(count: int64) = failwith "File stream failed"
+                member _.Seek(offset: int64, origin: SeekOrigin) = failwith "File stream failed"
+                member _.Write(bytes: byte[], offset: int, count: int) = failwith "File stream failed" }
+        let fileSystem =
+            { new IFileSystem with
+                    member _.FileExists(path: string) = true
+                    member _.DirectoryExists(path: string) = false
+                    member _.OpenOrCreate(path: string) = fileStream ()
+                    member _.CreateDirectory(path: string) = () }
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn fileSystem notifiedRef initialState)
+        let rec iterate (pieces: Pieces.Piece list) =
+            match pieces with
+            | [] -> ()
+            | piece::pieces' ->
+                let bitfield = Bitfield(initialState.Bitfield.Capacity)
+                bitfield.Set(Array.create (initialState.Bitfield.ToArray().Length) 0uy)
+                bitfield.Set(piece.Index, true)
+                piecesRef.Tell(Pieces.Request.LeechPiece bitfield, notifiedRef)
+                notifiedRef.ExpectMsg(Pieces.Response.LeechPiece ((piece.Index, piece.Length))) |> ignore
+                piecesRef.Tell(Pieces.LeechSuccess (piece.Index, Constants.singleFilePieces[piece.Index]
+                                                                 |> Array.chunkBySize Block.BlockLength), notifiedRef)
+                notifiedRef.ExpectMsg<Pieces.Notification>(Pieces.PieceLeechSuccess piece.Index) |> ignore
+                notifiedRef.ExpectMsg<Pieces.Notification>(fun (notification: Pieces.Notification) ->
+                    match notification with
+                    | Pieces.Notification.PieceWriteFailure (idx, error) -> error.Message.Equals($"Failed to copy received blocks into the buffer for piece %d{idx}")
+                    | _ -> false) |> ignore
+                iterate pieces'
+        let pieces =
+            initialState.Pieces.ToArray()
+            |> Array.map (fun kv -> kv.Value)
+            |> Array.toList
+        iterate pieces
         
     [<Fact>]
     member __.``Test should notify on leech failure``() =
-        ()
+        let initialState = createSingleFilePiecesState ()
+        let initialState = { initialState with PieceLength = 0 }
+        let fileStream () = 
+            { new MemoryStream() with
+                member _.SetLength(count: int64) = failwith "File stream failed"
+                member _.Seek(offset: int64, origin: SeekOrigin) = failwith "File stream failed"
+                member _.Write(bytes: byte[], offset: int, count: int) = failwith "File stream failed" }
+        let fileSystem =
+            { new IFileSystem with
+                    member _.FileExists(path: string) = true
+                    member _.DirectoryExists(path: string) = false
+                    member _.OpenOrCreate(path: string) = fileStream ()
+                    member _.CreateDirectory(path: string) = () }
+        let notifiedRef = __.CreateTestProbe()
+        let piecesRef = spawn __.Sys (Pieces.actorName ()) (Pieces.actorFn fileSystem notifiedRef initialState)
+        let rec iterate (pieces: Pieces.Piece list) =
+            match pieces with
+            | [] -> ()
+            | piece::pieces' ->
+                let bitfield = Bitfield(initialState.Bitfield.Capacity)
+                bitfield.Set(Array.create (initialState.Bitfield.ToArray().Length) 0uy)
+                bitfield.Set(piece.Index, true)
+                piecesRef.Tell(Pieces.Request.LeechPiece bitfield, notifiedRef)
+                notifiedRef.ExpectMsg(Pieces.Response.LeechPiece ((piece.Index, piece.Length))) |> ignore
+                piecesRef.Tell(Pieces.LeechFailure (piece.Index, Exception("Leeching failed")), notifiedRef)
+                notifiedRef.ExpectMsg<Pieces.Notification>(fun (notification: Pieces.Notification) ->
+                    match notification with
+                    | Pieces.Notification.PieceLeechFailure (_, error) -> error.Message.Equals("Leeching failed")
+                    | _ -> false) |> ignore
+                iterate pieces'
+        let pieces =
+            initialState.Pieces.ToArray()
+            |> Array.map (fun kv -> kv.Value)
+            |> Array.toList
+        iterate pieces

@@ -21,6 +21,53 @@ module ByteBuffer =
     let tryCopy (blocks: byte[][]) (buffer: byte[]) =
         try Ok(copy blocks buffer) with exn -> Error exn
 
+type Bitfields = uint32[]
+
+module Bitfields =
+    
+    let private random = Random()
+    
+    let create (capacity: int) : Bitfields = Array.create capacity 0u
+    
+    let add (bitfield: Bitfield) (bitfields: Bitfields) =
+         for idx in 0..(bitfields.Length - 1) do
+             if bitfield.Get(idx) && bitfields[idx] < UInt32.MaxValue then
+                 bitfields[idx] <- bitfields[idx] + 1u
+
+    let findFirst (selfBitfield: Bitfield) (peerBitfield: Bitfield) (bitfields: Bitfields) =
+         let rec findFirst idx result = 
+             if idx >= bitfields.Length then
+                 result
+             else
+                 if selfBitfield.Get(idx) && peerBitfield.Get(idx) then 
+                     Some idx
+                 else
+                     findFirst (idx + 1) result
+         findFirst 0 None        
+    
+    let findRarest (selfBitfield: Bitfield) (peerBitfield: Bitfield) (bitfields: Bitfields) =
+         let rec findRarest idx result = 
+             if idx >= bitfields.Length then
+                 result
+             else
+                 if selfBitfield.Get(idx) && peerBitfield.Get(idx) then 
+                     match result with
+                     | Some found when bitfields[idx] < bitfields[found] ->
+                         findRarest (idx + 1) (Some idx)
+                     | Some found -> findRarest (idx + 1) (Some found) 
+                     | None       -> findRarest (idx + 1) (Some idx)
+                 else
+                     findRarest (idx + 1) result
+         findRarest 0 None
+         
+    let find (selfBitfield: Bitfield) (peerBitfield: Bitfield) (bitfields: Bitfields) =
+        // Half of the time try to find the rarest piece, half of the time just get the first piece that matches.
+        // This is done in order to avoid swarming on rarest pieces and potentially getting stuck.
+        if random.Next(0, 2).Equals(0) then
+            findRarest selfBitfield peerBitfield bitfields
+        else
+            findFirst selfBitfield peerBitfield bitfields
+
 module Pieces =
     type File =
         { Path:   string 
@@ -236,22 +283,22 @@ module Pieces =
     let actorName () = "pieces"
     
     let actorFn fs notifiedRef initialState (mailbox: Actor<obj>) =
-        let rec receive (pieceBuffer: ByteBuffer) (cleanBitfield: Bitfield) (dirtyBitfield: Bitfield) (state: State) = actor {
+        let rec receive (pieceBuffer: ByteBuffer) (piecePicker: Bitfields) (cleanBitfield: Bitfield) (dirtyBitfield: Bitfield) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Command as command ->
-                return! handleCommand pieceBuffer cleanBitfield dirtyBitfield state command
+                return! handleCommand pieceBuffer piecePicker cleanBitfield dirtyBitfield state command
 
             | :? Message as message ->
-                return! handleMessage pieceBuffer cleanBitfield dirtyBitfield state message
+                return! handleMessage pieceBuffer piecePicker cleanBitfield dirtyBitfield state message
             
             | :? Request as request ->
-                return! handleRequest pieceBuffer cleanBitfield dirtyBitfield state request
+                return! handleRequest pieceBuffer piecePicker cleanBitfield dirtyBitfield state request
 
             | message ->
                 mailbox.Unhandled message
-                return! receive pieceBuffer cleanBitfield dirtyBitfield state }
+                return! receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state }
 
-            and handleCommand pieceBuffer cleanBitfield dirtyBitfield (state: State) command =
+            and handleCommand pieceBuffer piecePicker cleanBitfield dirtyBitfield (state: State) command =
                 match command with
                 | Start ->
                     match state with
@@ -265,12 +312,12 @@ module Pieces =
                             notifiedRef <! DirTreeWriteSuccess
                             notifiedRef <! StateChanged (NotificationState.Create(nextState))
                             mailbox.Self <! Command.UpdateRates
-                            receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                            receive pieceBuffer piecePicker cleanBitfield dirtyBitfield nextState
                         | Error exn ->
                             notifiedRef <! DirTreeWriteFailure (Exception("Failed to setup output directory tree", exn))
-                            receive pieceBuffer cleanBitfield dirtyBitfield state
+                            receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                     | _ ->
-                        receive pieceBuffer cleanBitfield dirtyBitfield state
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                 | Stop ->
                     match state with
                     | { Status = Started } ->
@@ -279,9 +326,9 @@ module Pieces =
                                             DownRate = Rate()
                                             UpRate   = Rate() }
                         notifiedRef <! StateChanged (NotificationState.Create(nextState))
-                        receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield nextState
                     | _ ->
-                        receive pieceBuffer cleanBitfield dirtyBitfield state
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                 | UpdateRates ->
                     match state with
                     | { Status = Started } when mailbox.Context.Sender.Equals(mailbox.Context.Self) ->
@@ -289,11 +336,11 @@ module Pieces =
                         state.UpRate.Update(state.Uploaded)
                         notifiedRef <! StateChanged (NotificationState.Create(state))
                         mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(float 1.0f), mailbox.Self, Command.UpdateRates)
-                        receive pieceBuffer cleanBitfield dirtyBitfield state 
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state 
                     | _ ->
-                        receive pieceBuffer cleanBitfield dirtyBitfield state
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
 
-            and handleMessage pieceBuffer cleanBitfield dirtyBitfield (state: State) message =
+            and handleMessage pieceBuffer piecePicker cleanBitfield dirtyBitfield (state: State) message =
                 match message with
                 | LeechSuccess (idx, blocks) ->
                     match state.Pieces.TryGetValue(idx) with
@@ -311,30 +358,60 @@ module Pieces =
                                     dirtyBitfield.Set(idx, false)
                                     notifiedRef <! PieceWriteSuccess idx
                                     notifiedRef <! StateChanged (NotificationState.Create(nextState))
-                                    receive pieceBuffer cleanBitfield dirtyBitfield nextState
+                                    receive pieceBuffer piecePicker cleanBitfield dirtyBitfield nextState
                                 | Error error ->
                                     notifiedRef <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", error))
-                                    receive pieceBuffer cleanBitfield dirtyBitfield state
+                                    receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                             | Error error ->
                                 notifiedRef <! PieceWriteFailure (idx, Exception($"Failed to copy received blocks into the buffer for piece %d{idx}", error))
-                                receive pieceBuffer cleanBitfield dirtyBitfield state
+                                receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                         else
-                            receive pieceBuffer cleanBitfield dirtyBitfield state
+                            receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                     | _ ->
-                        receive pieceBuffer cleanBitfield dirtyBitfield state
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
                 | LeechFailure (idx, error)  ->
                     match state.Pieces.TryGetValue(idx) with
-                    | true, _ when dirtyBitfield.Get(idx) -> notifiedRef <! PieceLeechFailure (idx, error)
-                    | _ -> () 
-                    receive pieceBuffer cleanBitfield dirtyBitfield state
+                    | true, _ when dirtyBitfield.Get(idx) ->
+                        notifiedRef <! PieceLeechFailure (idx, error)
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
+                    | _ ->
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
             
-            and handleRequest pieceBuffer cleanBitfield dirtyBitfield (state: State) request =
-                receive pieceBuffer cleanBitfield dirtyBitfield state
+            and handleRequest pieceBuffer piecePicker cleanBitfield dirtyBitfield (state: State) request =
+                match request with
+                | Request.SelfBitfield ->
+                    mailbox.Context.Sender <! Response.SelfBitfield state.Bitfield
+                    receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
+                | Request.LeechPiece bitfield ->
+                    // Try to pick rarest piece that is in the clean bitfield and in the peer bitfield (a piece that we want and one that the peer has). 
+                    match Bitfields.find cleanBitfield bitfield piecePicker with
+                    | Some idx ->
+                        Bitfields.add bitfield piecePicker
+                        cleanBitfield.Set(idx, false)
+                        dirtyBitfield.Set(idx, true)
+                        mailbox.Context.Sender <! Response.LeechPiece (state.Pieces[idx].Index, state.Pieces[idx].Length)
+                        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
+                    | None ->
+                        // If no match was found then look in the dirty pieces bitfield. These are the pieces that
+                        // have been given to other peers to download but have not completed yet or have failed to download.
+                        //
+                        // End-game:
+                        //  The goal of this algorithm is to get unique clean pieces from peers first (no peer will download the
+                        //  same piece), but once those have been exhausted - make idle peers swarm on problematic, dirty pieces.
+                        match Bitfields.find dirtyBitfield bitfield piecePicker with
+                        | Some idx ->
+                            Bitfields.add bitfield piecePicker
+                            mailbox.Context.Sender <! Response.LeechPiece (state.Pieces[idx].Index, state.Pieces[idx].Length)
+                            receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
+                        | _ ->
+                            Bitfields.add bitfield piecePicker
+                            receive pieceBuffer piecePicker cleanBitfield dirtyBitfield state
 
         let pieceBuffer = ByteBuffer.create initialState.PieceLength
+        let piecePicker = Bitfields.create initialState.Bitfield.Capacity
         let cleanBitfield = Bitfield(initialState.Bitfield).Not()
         let dirtyBitfield = Bitfield(initialState.Bitfield.Capacity)
-        receive pieceBuffer cleanBitfield dirtyBitfield initialState
+        receive pieceBuffer piecePicker cleanBitfield dirtyBitfield initialState
     
     let defaultActorFn notifiedRef initialState mailbox =
         actorFn (FileSystem.createLocal ()) notifiedRef initialState mailbox
