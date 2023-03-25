@@ -47,27 +47,27 @@ module TrackerTests =
     
     [<Fact>]
     let ``Test tracker announce success with peer list not compact`` () =
-        let call _ =
+        let query _ =
             notCompactResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
-        let response = defaultAnnounce Constants.Announce (Hash [||]) (PeerId [||]) 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
+        let response = defaultAnnounce Constants.Announce (Hash [||]) (PeerId [||]) 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) query
         assertTrackerResponse response
         
     [<Fact>]
     let ``Test tracker announce success with peer list compact`` () =
-        let call _ =
+        let query _ =
             compactResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
-        let response = defaultAnnounce Constants.Announce (Hash [||]) (PeerId [||]) 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call
+        let response = defaultAnnounce Constants.Announce (Hash [||]) (PeerId [||]) 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) query
         assertTrackerResponse response
             
     [<Fact>]
     let ``Test tracker announce failure`` () =
-        let call _ =
+        let query _ =
             failureResponse
             |> BValue.bdict
             |> BEncode.defaultToBytes
         Assert.ThrowsAny<Exception>(fun () ->
-            defaultAnnounce Constants.Announce (Hash [||]) (PeerId [||]) 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) call |> ignore)
+            defaultAnnounce Constants.Announce (Hash [||]) (PeerId [||]) 0 0L 0L 0L (Some Tracker.Event.Started) (Some 25) query |> ignore)

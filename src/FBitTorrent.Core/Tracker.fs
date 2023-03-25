@@ -139,7 +139,7 @@ module Tracker =
             | _ -> peers
         unpack bytes []
     
-    let httpCall (url: string) =
+    let httpQuery (url: string) =
         let client = new HttpClient()
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"%s{Application.AppName}/%.2f{Application.AppVersion}")
         client.DefaultRequestHeaders.Accept.ParseAdd("*/*")
@@ -177,17 +177,17 @@ module Tracker =
         | value ->
             failwith $"Unexpected encoded response type %A{value} - expected %A{BDictionaryType}"
         
-    let announce (url: string) (request: Request) call =
+    let announce (url: string) (request: Request) query =
         match UriBuilder(url) with
         | builder when
             builder.Scheme.Equals "http" ||
             builder.Scheme.Equals "https" ->
             builder.Query <- request.Encoded
-            parse (call (builder.ToString()))
+            parse (query (builder.ToString()))
         | builder ->
             failwith $"Unsupported protocol %A{builder.Scheme}"
 
-    let defaultAnnounce url ih pid port uploaded downloaded left event numWant call =
+    let defaultAnnounce url ih pid port uploaded downloaded left event numWant query =
         let request =
             { InfoHash   = ih
               PeerId     = pid
@@ -202,4 +202,4 @@ module Tracker =
               NumWant    = numWant
               Key        = None
               TrackerId  = None }
-        announce url request call
+        announce url request query

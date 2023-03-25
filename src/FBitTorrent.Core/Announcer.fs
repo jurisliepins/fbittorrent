@@ -46,7 +46,7 @@ module Announcer =
     
     let actorName () = "announcer"
     
-    let actorFn call (mailbox: Actor<obj>) =
+    let actorFn query (mailbox: Actor<obj>) =
         let rec receive () = actor {
             match! mailbox.Receive() with
             | :? Command as command -> 
@@ -69,7 +69,7 @@ module Announcer =
                 Event      = eventOpt
                 NumWant    = numWantOpt }) ->
                 try
-                    match Tracker.defaultAnnounce url ih pid port downloaded uploaded left (eventOpt |> Option.map (fun event -> event.ToTrackerEvent())) numWantOpt call with
+                    match Tracker.defaultAnnounce url ih pid port downloaded uploaded left (eventOpt |> Option.map (fun event -> event.ToTrackerEvent())) numWantOpt query with
                     | { Complete   = complete
                         Incomplete = incomplete
                         Interval   = interval
@@ -90,7 +90,7 @@ module Announcer =
         
         receive ()
         
-    let defaultActorFn mailbox = actorFn Tracker.httpCall mailbox
+    let defaultActorFn mailbox = actorFn Tracker.httpQuery mailbox
     
 module AnnouncerExtensions =
     type IActorContext with
