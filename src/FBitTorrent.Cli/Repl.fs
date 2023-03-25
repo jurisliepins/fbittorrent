@@ -81,32 +81,10 @@ module Repl =
         repl system clientRef
     
     and get system clientRef (ihOpt: Hash option) =
-        let formatString (str: string) =
-            match str with
-            | _ when str.Length > 40 ->
-                String.Format("{0}...", str.Substring(0, 37))
-            | _ -> str
-        let formatBytes (bytes: int64) = String.Format("{0} B", bytes)
-        let formatPercentage (percentage: float) = String.Format("{0:F2}%", percentage)
         let print (torrents: Client.Torrent list) =
             match torrents with
             | []       -> ()
-            | torrents -> 
-                Console.WriteLine("+" + new string('-', 55) + "+")
-                for torrent in torrents do
-                    Console.Write(StringBuilder()
-                        .AppendLine(String.Format("| {0,-10} | {1,-40} |", formatString (torrent.Status.ToString()), (formatString (torrent.Name))))
-                        .AppendLine(String.Format("|" + new string('-', 55) + "|"))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Info Hash", formatString (torrent.InfoHash.ToString())))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Peer ID", formatString (torrent.PeerId.ToString())))
-                        .AppendLine(String.Format("|" + new string('-', 55) + "|"))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Length", formatBytes torrent.Length))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Downloaded", formatBytes torrent.Downloaded))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Uploaded", formatBytes torrent.Uploaded))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Complete", formatPercentage ((float torrent.Length - float torrent.Left) / float torrent.Length * 100.0)))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Down speed", torrent.DownRate))
-                        .AppendLine(String.Format("| {0,-10} : {1,40} |", "Up speed", torrent.UpRate)))
-                    Console.WriteLine("+" + new string('-', 55) + "+")
+            | torrents -> Console.WriteLine(torrents)
         match ihOpt with
         | Some ih -> print (Op.get clientRef (Some ih) |> Async.RunSynchronously)
         | None    -> print (Op.get clientRef None |> Async.RunSynchronously)

@@ -67,14 +67,8 @@ type Bitfield =
     member __.ToArray() = __.bytes.ToArray()
     
     override __.ToString() =
-        let lines = __.bytes
-                          .Select(fun byte -> Convert.ToString(byte, 2).PadLeft(8, '0'))
-                          .Chunk(4)
-                          .Select(fun chunk -> String.Join(" ", chunk))
-        if lines.Count() > 4 then 
-            String.Join("\n", lines.Take(4).Append("..."))
-        else
-            String.Join("\n", lines)
+        let blocks = __.bytes.Select(fun byte -> Convert.ToString(byte, 2).PadLeft(8, '0'))
+        String.Join(" ", if blocks.Count() > 4 then blocks.Take(4).Append("...") else blocks)
     
     override __.GetHashCode() =
         __.bytes.Aggregate(0, (fun result byte -> (result * 31) ^^^ (int byte)))
