@@ -1,7 +1,7 @@
 FBitTorrent
 ===========
 
-Implementation of the BitTorrent protocol in F# using Akka.NET. 
+Implementation of the BitTorrent protocol in F# in Akka.NET. 
 
 ## Details
 
