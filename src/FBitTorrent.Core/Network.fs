@@ -137,10 +137,6 @@ type ConnectionReader(stream: Stream) =
     member __.AsyncReadUInt64() = async {
         let! bytes = __.AsyncReadBytes(sizeof<uint64>)
         return BigEndianConverter.toUInt64 bytes }
-    
-    member _.Flush() = stream.Flush()
-    
-    member _.AsyncFlush() = Async.AwaitTask(stream.FlushAsync())
 
 type ConnectionWriter(stream: Stream) =
     interface IDisposable with
