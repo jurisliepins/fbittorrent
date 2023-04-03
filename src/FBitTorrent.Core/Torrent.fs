@@ -90,7 +90,7 @@ module Torrent =
 
     let actorName (ih: Hash) = $"torrent-%A{ih}"
     
-    let actorFn announcerFn connectorFn piecesFn ioFn peerFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
+    let actorFn createMessageConnection announcerFn connectorFn piecesFn ioFn peerFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
         let announcerRef = spawn mailbox (Announcer.actorName ()) announcerFn
         let connectorRef = spawn mailbox (Connector.actorName ()) connectorFn
@@ -302,7 +302,7 @@ module Torrent =
                 | { Status = Started } ->
                     if mailbox.Context.GetPeers().Count() < state.Settings.MaxSeedCount then
                         let actorName = Peer.actorName connection.RemoteEndpoint.Address connection.RemoteEndpoint.Port
-                        let actorFn = peerFn mailbox.Self piecesRef (Message.createConnection connection) (Peer.createState state.Bitfield.Capacity)
+                        let actorFn = peerFn mailbox.Self piecesRef (createMessageConnection connection) (Peer.createState state.Bitfield.Capacity)
                         let ref = monitor (spawn mailbox actorName actorFn) mailbox
                         ref <! Peer.Read
                         ref <! Peer.Leech (Some (Bitfield.createFromBitfield state.Bitfield))
@@ -352,7 +352,7 @@ module Torrent =
         receive (RateMeter.createFromBytes initialState.Downloaded) (RateMeter.createFromBytes initialState.Uploaded) initialState
     
     let defaultActorFn notifiedRef initialState (mailbox: Actor<obj>) =
-        actorFn Announcer.defaultActorFn Connector.defaultActorFn Pieces.defaultActorFn IO.defaultActorFn Peer.defaultActorFn notifiedRef initialState mailbox
+        actorFn Message.createConnection Announcer.defaultActorFn Connector.defaultActorFn Pieces.defaultActorFn IO.defaultActorFn Peer.defaultActorFn notifiedRef initialState mailbox
         
 module TorrentExtensions =
     type IActorContext with

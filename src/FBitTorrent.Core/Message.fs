@@ -115,7 +115,6 @@ type IMessageConnection =
     abstract member AsyncReadMessage: unit -> Async<Message>
 
 module Message =
-    type AsyncConnect = IPEndPoint -> Async<IMessageConnection>
 
     let [<Literal>] DefaultWriteTimeoutMillis = 120_000
     
@@ -406,7 +405,3 @@ module Message =
             member __.AsyncWriteMessage(message: Message) = __.AsyncWriteMessage(message, DefaultWriteTimeoutMillis)
             member __.AsyncReadMessage() = __.AsyncReadMessage(DefaultReadTimeoutMillis)
             member _.Dispose() = connection.Dispose() }
-    
-    let asyncTcpConnect endpoint = async {
-        let! connection = Connection.asyncTcpConnect endpoint
-        return createConnection connection }

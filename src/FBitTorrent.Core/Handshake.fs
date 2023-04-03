@@ -27,7 +27,6 @@ type IHandshakeConnection =
     abstract member AsyncReadHandshake: unit -> Async<Handshake>
     
 module Handshake =
-    type AsyncConnect = IPEndPoint -> Async<IHandshakeConnection>
     
     let protocolBytes = [| 66uy; 105uy; 116uy; 84uy; 111uy; 114uy; 114uy; 101uy; 110uy; 116uy; 32uy; 112uy; 114uy; 111uy; 116uy; 111uy; 99uy; 111uy; 108uy |]
     let reservedBytes = [| 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; 0uy; |]
@@ -111,7 +110,3 @@ module Handshake =
             member __.AsyncWriteHandshake(handshake: Handshake) = __.AsyncWriteHandshake(handshake, DefaultWriteTimeoutMillis)
             member __.AsyncReadHandshake() = __.AsyncReadHandshake(DefaultReadTimeoutMillis)
             member _.Dispose() = connection.Dispose() }
-    
-    let asyncTcpConnect endpoint = async {
-        let! connection = Connection.asyncTcpConnect endpoint
-        return createConnection connection }

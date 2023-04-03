@@ -9,6 +9,7 @@ open Akka.FSharp
 open FBitTorrent.Core
 
 module Connector =
+    open Connection
     open Handshake
     
     type Command =
@@ -41,7 +42,7 @@ module Connector =
     
     let actorName () = "connector"
     
-    let actorFn (asyncConnect: AsyncConnect) (mailbox: Actor<obj>) =
+    let actorFn (asyncConnect: IPEndPoint -> Async<IConnection>) (createHandshakeConnection: IConnection -> IHandshakeConnection) (mailbox: Actor<obj>) =
         let rec receive () = actor {
             match! mailbox.Receive() with
             | :? Command as command ->
@@ -57,7 +58,7 @@ module Connector =
                 Async.StartAsTask(async {
                     try
                         let! connection = asyncConnect (IPEndPoint(address, port))
-                        return! asyncPerformHandshake handshake address port connection    
+                        return! asyncPerformHandshake handshake address port (createHandshakeConnection connection)    
                     with exn ->
                         return Failure (address, port, Exception($"Failed to connect to %A{address}:%d{port}", exn)) }
                 ).PipeTo(mailbox.Context.Sender) |> ignore
@@ -65,7 +66,7 @@ module Connector =
         
         receive ()
         
-    let defaultActorFn mailbox = actorFn asyncTcpConnect mailbox
+    let defaultActorFn mailbox = actorFn asyncTcpConnect createConnection mailbox
     
 module ConnectorExtensions =
     type IActorContext with
