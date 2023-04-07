@@ -177,6 +177,7 @@ module Pieces =
                             notifiedRef <! PieceLeechSuccess (idx, piece)
                             state.RunningPieces |> Bitfield.setBit idx false
                         else
+                            piece.Release()
                             logDebug mailbox $"Leeched piece %d{idx} hash is invalid"
                             notifiedRef <! PieceLeechFailure (idx, Exception($"Expected hash did not match hash of received piece %d{idx}"))
                     else
