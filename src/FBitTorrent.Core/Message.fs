@@ -103,8 +103,7 @@ with
         | PortMessage     port               -> $"Port(listenPort=%d{port})"
 
 type IMessageConnection =
-    inherit IDisposable
-    abstract member Connection: IConnection with get
+    inherit IConnection
     abstract member WriteMessage: Message * int -> unit
     abstract member ReadMessage: int -> Message
     abstract member AsyncWriteMessage: Message * int -> Async<unit>
@@ -387,21 +386,18 @@ module Message =
 
     let createConnection (connection: IConnection) =
         { new IMessageConnection with
-            member _.Connection with get() = connection
-            member _.WriteMessage(message: Message, timeoutMillis: int) =
-                connection.Stream.WriteTimeout <- timeoutMillis
-                write connection.Writer message
-            member _.ReadMessage(timeoutMillis: int) =
-                connection.Stream.ReadTimeout <- timeoutMillis
-                read connection.Reader
-            member _.AsyncWriteMessage(message: Message, timeoutMillis: int) =
-                connection.Stream.WriteTimeout <- timeoutMillis
-                asyncWrite connection.Writer message
-            member _.AsyncReadMessage(timeoutMillis: int) =
-                connection.Stream.ReadTimeout <- timeoutMillis
-                asyncRead connection.Reader
+            member _.Stream with get() = connection.Stream
+            member _.Writer with get() = connection.Writer
+            member _.Reader with get() = connection.Reader
+            member _.RemoteEndpoint with get() = connection.RemoteEndpoint
+            member _.LocalEndpoint with get() = connection.LocalEndpoint
+            member _.Disconnect() = connection.Disconnect()
+            member _.Dispose() = connection.Dispose()
+            member _.WriteMessage(message: Message, timeoutMillis: int) = connection.Stream.WriteTimeout <- timeoutMillis; write connection.Writer message
+            member _.ReadMessage(timeoutMillis: int) = connection.Stream.ReadTimeout <- timeoutMillis; read connection.Reader
+            member _.AsyncWriteMessage(message: Message, timeoutMillis: int) = connection.Stream.WriteTimeout <- timeoutMillis; asyncWrite connection.Writer message
+            member _.AsyncReadMessage(timeoutMillis: int) = connection.Stream.ReadTimeout <- timeoutMillis; asyncRead connection.Reader
             member __.WriteMessage(message: Message) = __.WriteMessage(message, DefaultWriteTimeoutMillis)
             member __.ReadMessage() = __.ReadMessage(DefaultReadTimeoutMillis)
             member __.AsyncWriteMessage(message: Message) = __.AsyncWriteMessage(message, DefaultWriteTimeoutMillis)
-            member __.AsyncReadMessage() = __.AsyncReadMessage(DefaultReadTimeoutMillis)
-            member _.Dispose() = connection.Dispose() }
+            member __.AsyncReadMessage() = __.AsyncReadMessage(DefaultReadTimeoutMillis) }

@@ -15,8 +15,7 @@ type Handshake =
         PeerId:   byte[]
 
 type IHandshakeConnection =
-    inherit IDisposable
-    abstract member Connection: IConnection with get
+    inherit IConnection
     abstract member WriteHandshake: Handshake * int -> unit
     abstract member ReadHandshake: int -> Handshake
     abstract member AsyncWriteHandshake: Handshake * int -> Async<unit>
@@ -92,21 +91,18 @@ module Handshake =
 
     let createConnection (connection: IConnection) =
         { new IHandshakeConnection with
-            member _.Connection with get() = connection
-            member _.WriteHandshake(handshake: Handshake, timeoutMillis: int) =
-                connection.Stream.WriteTimeout <- timeoutMillis
-                write connection.Writer handshake
-            member _.ReadHandshake(timeoutMillis: int) =
-                connection.Stream.ReadTimeout <- timeoutMillis
-                read connection.Reader
-            member _.AsyncWriteHandshake(handshake: Handshake, timeoutMillis: int) =
-                connection.Stream.WriteTimeout <- timeoutMillis
-                asyncWrite connection.Writer handshake
-            member _.AsyncReadHandshake(timeoutMillis: int) =
-                connection.Stream.ReadTimeout <- timeoutMillis
-                asyncRead connection.Reader
+            member _.Stream with get() = connection.Stream
+            member _.Writer with get() = connection.Writer
+            member _.Reader with get() = connection.Reader
+            member _.RemoteEndpoint with get() = connection.RemoteEndpoint
+            member _.LocalEndpoint with get() = connection.LocalEndpoint
+            member _.Disconnect() = connection.Disconnect()
+            member _.Dispose() = connection.Dispose()
+            member _.WriteHandshake(handshake: Handshake, timeoutMillis: int) = connection.Stream.WriteTimeout <- timeoutMillis; write connection.Writer handshake
+            member _.ReadHandshake(timeoutMillis: int) = connection.Stream.ReadTimeout <- timeoutMillis; read connection.Reader
+            member _.AsyncWriteHandshake(handshake: Handshake, timeoutMillis: int) = connection.Stream.WriteTimeout <- timeoutMillis; asyncWrite connection.Writer handshake
+            member _.AsyncReadHandshake(timeoutMillis: int) = connection.Stream.ReadTimeout <- timeoutMillis; asyncRead connection.Reader
             member __.WriteHandshake(handshake: Handshake) = __.WriteHandshake(handshake, DefaultWriteTimeoutMillis)
             member __.ReadHandshake() = __.ReadHandshake(DefaultReadTimeoutMillis)
             member __.AsyncWriteHandshake(handshake: Handshake) = __.AsyncWriteHandshake(handshake, DefaultWriteTimeoutMillis)
-            member __.AsyncReadHandshake() = __.AsyncReadHandshake(DefaultReadTimeoutMillis)
-            member _.Dispose() = connection.Dispose() }
+            member __.AsyncReadHandshake() = __.AsyncReadHandshake(DefaultReadTimeoutMillis) }
