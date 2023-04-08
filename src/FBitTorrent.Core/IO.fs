@@ -61,7 +61,6 @@ module IO =
             stream.SetLength(slength)
         stream.Seek(soffset, SeekOrigin.Begin) |> ignore
         bytes.WriteTo(stream, int boffset, int blength)
-        bytes.Release()
     
     let private writePiece (fs: IFileSystem) (rootDirPath: string) (piece: Pieces.Piece) (bytes: ByteBuffer) =
         let pbeg = piece.Offset
@@ -116,6 +115,10 @@ module IO =
                     mailbox.Context.Sender <! PieceWriteSuccess idx
                 with exn -> 
                     mailbox.Context.Sender <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", exn))
+                try
+                    piece.Release()
+                with exn ->
+                    logError mailbox $"Failed to release piece %d{idx} %A{exn}"
                 receive state
 
         receive initialState

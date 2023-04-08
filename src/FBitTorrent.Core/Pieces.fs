@@ -177,8 +177,11 @@ module Pieces =
                             notifiedRef <! PieceLeechSuccess (idx, piece)
                             state.RunningPieces |> Bitfield.setBit idx false
                         else
-                            piece.Release()
                             logDebug mailbox $"Leeched piece %d{idx} hash is invalid"
+                            try
+                                piece.Release()
+                            with exn ->
+                                logError mailbox $"Failed to release piece %d{idx} %A{exn}"
                             notifiedRef <! PieceLeechFailure (idx, Exception($"Expected hash did not match hash of received piece %d{idx}"))
                     else
                         // Piece is currently not running means that multiple peers were leeching and one already successfully completed.
