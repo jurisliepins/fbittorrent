@@ -24,7 +24,8 @@ module Experiments =
                 let rec receive () = actor {
                     match! mailbox.Receive() with
                     | :? Tcp.Received as received ->
-                        logDebug mailbox $"Received %d{received.Data.Count} bytes from %A{remoteAddress}"
+                        // logDebug mailbox $"Received %d{received.Data.Count} bytes from %A{remoteAddress}"
+                        // logDebug mailbox $"Received %d{received.Data.Count}"
                         parent.Context.Sender <! Tcp.Write.Create(ByteString.FromBytes(block))
                         return! receive ()
                         
@@ -94,7 +95,7 @@ module Experiments =
                 akka { loglevel = debug }
                 """
                 |> ConfigurationFactory.ParseString
-            let system = AkkaSystem.create "server-system" config
+            let system = AkkaSystem.create "client-system" config
             
             let connectionFn (mailbox: Actor<obj>) =
                 let rec receive (state: (EndPoint * EndPoint) option) = actor {
@@ -114,9 +115,10 @@ module Experiments =
                     | :? Tcp.Received as received ->
                         match state with
                         | Some (localAddress, remoteAddress) ->
-                            logDebug mailbox $"Received %d{received.Data.Count} bytes from %A{remoteAddress}"
+                            // logDebug mailbox $"Received %d{received.Data.Count} bytes from %A{remoteAddress}"
+                            // logDebug mailbox $"Received %d{received.Data.Count}"
                             mailbox.Context.Sender <! Tcp.Write.Create(ByteString.FromBytes([| 1uy |]))
-                            logDebug mailbox $"Requested bytes from %A{remoteAddress}"
+                            // logDebug mailbox $"Requested bytes from %A{remoteAddress}"
                             return! receive state
                         | None ->
                             logDebug mailbox $"Received %d{received.Data.Count} bytes but no active connection present (should never happen)"
