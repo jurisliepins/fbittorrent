@@ -7,13 +7,16 @@ open Akka.Configuration
 open FBitTorrent.Core
 
 module Program =
+    
+    module AkkaSystem = Akka.FSharp.System
+    
     let private runClient () =
         let config =
             """
             akka { loglevel = off }
             """
             |> ConfigurationFactory.ParseString
-        let system = System.create "fbittorrent-system" config
+        let system = AkkaSystem.create "fbittorrent-system" config
         let clientRef = spawn system (Client.actorName ()) (Client.defaultActorFn (Client.createState ()))
         Repl.repl system clientRef
         
