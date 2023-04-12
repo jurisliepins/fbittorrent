@@ -10,10 +10,8 @@ open FBitTorrent.Core
 
 module Peer =
     module Reader =
-        [<Struct>]
         type Command = Read
         
-        [<Struct>]
         type ReadResult =
             | Success of Result: Message
             | Failure of Error:  Exception
@@ -45,10 +43,8 @@ module Peer =
             receive ()
     
     module Writer =
-        [<Struct>]
         type Command = Write of Message
         
-        [<Struct>]
         type WriteResult =
             | Success
             | Failure of Error: Exception
