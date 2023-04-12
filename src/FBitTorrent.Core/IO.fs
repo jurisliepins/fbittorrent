@@ -8,12 +8,17 @@ open Akka.Actor
 open Akka.FSharp
 
 module IO =
+    type Status =
+        | Initialised
+        | Uninitialised
+    
     type State =
-        { RootDirPath: string
-          DirPaths:    string list
-          PieceLength: int
-          Pieces:      ReadOnlyCollection<Pieces.Piece>
-          Files:       ReadOnlyCollection<Pieces.File> }
+        { Status:          Status
+          RootDirPath:     string
+          DirPaths:        string list
+          PieceLength:     int
+          Pieces:          ReadOnlyCollection<Pieces.Piece>
+          Files:           ReadOnlyCollection<Pieces.File> }
     
     let private createDirPaths (pieces: ReadOnlyCollection<Pieces.Piece>) =
         pieces
@@ -25,44 +30,36 @@ module IO =
         |> Seq.toList
     
     let createState rootDirPath pieceLength pieces files =
-        { RootDirPath = rootDirPath
-          DirPaths    = createDirPaths pieces
-          PieceLength = pieceLength
-          Pieces      = pieces
-          Files       = files }
+        { Status          = Uninitialised
+          RootDirPath     = rootDirPath
+          DirPaths        = createDirPaths pieces
+          PieceLength     = pieceLength
+          Pieces          = pieces
+          Files           = files }
 
     type Command =
-        | CreateDirs
         | WritePiece of int * ByteBuffer
     
     type CommandResult =
-        | DirsCreateSuccess of string list
-        | DirsCreateFailure of Exception
         | PieceWriteSuccess of int
         | PieceWriteFailure of int * Exception
     
     let private createDirs (fs: IFileSystem) (rootDirPath: string) (dirPaths: string list) =
         if fs.DirectoryExists(rootDirPath) then
             dirPaths
-            |> Seq.map (fun dirPath ->
+            |> Seq.iter (fun dirPath ->
                 let path = Path.Combine(rootDirPath, dirPath)
-                if fs.DirectoryExists(path) then
-                    None
-                else
-                    fs.CreateDirectory(path)
-                    Some path)
-            |> Seq.choose id
-            |> Seq.toList
+                if not (fs.DirectoryExists(path)) then
+                    fs.CreateDirectory(path) )
         else
             failwith $"Output directory %s{rootDirPath} does not exist"
     
-    let private writeStream (stream: Stream) (soffset: int64) (slength: int64) (bytes: ByteBuffer) (boffset: int64) (blength: int64) =
-        if slength > stream.Length then
-            stream.SetLength(slength)
-        stream.Seek(soffset, SeekOrigin.Begin) |> ignore
-        bytes.WriteTo(stream, int boffset, int blength)
-    
     let private writePiece (fs: IFileSystem) (rootDirPath: string) (piece: Pieces.Piece) (bytes: ByteBuffer) =
+        let writeStream (stream: Stream) (soffset: int64) (slength: int64) (bytes: ByteBuffer) (boffset: int64) (blength: int64) =
+            if slength > stream.Length then
+                stream.SetLength(slength)
+            stream.Seek(soffset, SeekOrigin.Begin) |> ignore
+            bytes.WriteTo(stream, int boffset, int blength)
         let pbeg = piece.Offset
         let pend = piece.Offset + int64 piece.Length
         for file in piece.Files do
@@ -97,30 +94,44 @@ module IO =
                 return! handleCommand state command
             
             | message ->
-                mailbox.Unhandled(message)
-                return! receive state }
+                return! unhandled state message }
         
         and handleCommand (state: State) command =
             match command with
-            | CreateDirs ->
-                try
-                    let createdDirs = createDirs fs state.RootDirPath state.DirPaths
-                    mailbox.Context.Sender <! DirsCreateSuccess createdDirs
-                with exn ->
-                    mailbox.Context.Sender <! DirsCreateFailure (Exception("Failed to create directories", exn))
-                receive state
             | WritePiece (idx, piece) ->
-                try
-                    writePiece fs state.RootDirPath state.Pieces[idx] piece
-                    mailbox.Context.Sender <! PieceWriteSuccess idx
-                with exn -> 
-                    mailbox.Context.Sender <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", exn))
-                try
-                    piece.Release()
-                with exn ->
-                    logError mailbox $"Failed to release piece %d{idx} %A{exn}"
-                receive state
+                match state with
+                | { Status = Initialised } ->
+                    try
+                        writePiece fs state.RootDirPath state.Pieces[idx] piece
+                        mailbox.Context.Sender <! PieceWriteSuccess idx
+                    with exn ->
+                        mailbox.Context.Sender <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", exn))
+                    try
+                        piece.Release()
+                    with exn ->
+                        logError mailbox $"Failed to release piece %d{idx} %A{exn}"
+                    receive state
+                    
+                | { Status = Uninitialised } ->
+                    try
+                        createDirs fs state.RootDirPath state.DirPaths
+                        try
+                            writePiece fs state.RootDirPath state.Pieces[idx] piece
+                            mailbox.Context.Sender <! PieceWriteSuccess idx
+                        with exn ->
+                            mailbox.Context.Sender <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", exn))
+                    with exn ->
+                        mailbox.Context.Sender <! PieceWriteFailure (idx, Exception("Failed to create directories", exn))
+                    try
+                        piece.Release()
+                    with exn ->
+                        logError mailbox $"Failed to release piece %d{idx} %A{exn}"
+                    receive { state with Status = Initialised }
 
+        and unhandled (state: State) message =
+            mailbox.Unhandled(message)
+            receive state
+        
         receive initialState
         
     let defaultActorFn initialState mailbox =

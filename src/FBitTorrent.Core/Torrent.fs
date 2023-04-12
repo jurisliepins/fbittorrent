@@ -90,6 +90,29 @@ module Torrent =
 
     let actorName (ih: Hash) = $"torrent-%A{ih}"
     
+    let private createAnnounceArgs (state: State) eventOpt : Announcer.AnnounceArgs =
+        { Url        = state.Announce
+          InfoHash   = state.InfoHash
+          PeerId     = state.PeerId
+          Port       = state.Settings.Port
+          Downloaded = state.Downloaded
+          Uploaded   = state.Uploaded
+          Left       = state.Left
+          Event      = eventOpt
+          NumWant    = None }
+    
+    let private createStartedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
+        createAnnounceArgs state (Some Announcer.Started)
+         
+    let private createStoppedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
+        createAnnounceArgs state (Some Announcer.Stopped)
+         
+    let private createCompletedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
+        createAnnounceArgs state (Some Announcer.Completed)
+        
+    let private createRefreshedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
+        createAnnounceArgs state None
+    
     let actorFn createMessageConnection announcerFn connectorFn piecesFn ioFn peerFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
         let announcerRef = spawn mailbox (Announcer.actorName ()) announcerFn
@@ -120,15 +143,15 @@ module Torrent =
                 return! handleTerminatedMessage downMeter upMeter state message
             
             | message ->
-                mailbox.Unhandled(message)
-                return! receive downMeter upMeter state }
+                return! unhandled downMeter upMeter state message }
         
         and handleCommand downMeter upMeter (state: State) command =
             match command with
             | Start ->
                 match state with
                 | { Status = Stopped } ->
-                    ioRef <! IO.CreateDirs
+                    logDebug mailbox $"Announcing '%A{Some Tracker.Started}' on %s{state.Announce}"
+                    announcerRef <! Announcer.Announce (createStartedAnnounceArgs state)
                     notifiedRef <! StatusChanged Started
                     logInfo mailbox "Started"
                     receive downMeter upMeter { state with Status = Started }
@@ -140,17 +163,7 @@ module Torrent =
                 | { Status = Started }
                 | { Status = Errored } ->
                     logDebug mailbox $"Announcing '%A{Some Tracker.Stopped}' on %s{state.Announce}"
-                    let args: Announcer.AnnounceArgs =
-                         { Url        = state.Announce
-                           InfoHash   = state.InfoHash
-                           PeerId     = state.PeerId
-                           Port       = state.Settings.Port
-                           Downloaded = state.Downloaded
-                           Uploaded   = state.Uploaded
-                           Left       = state.Left
-                           Event      = Some Announcer.Stopped
-                           NumWant    = None }
-                    announcerRef <! Announcer.Announce args
+                    announcerRef <! Announcer.Announce (createStoppedAnnounceArgs state)
                     logDebug mailbox "Stopping peers"
                     for ref in mailbox.Context.GetPeers() do
                         mailbox.Context.Stop(ref)
@@ -161,15 +174,15 @@ module Torrent =
                     logDebug mailbox "Torrent already stopped"
                     receive downMeter upMeter state
             | MeasureRate ->
-                downMeter |> RateMeter.update state.Downloaded
-                upMeter |> RateMeter.update state.Uploaded
+                RateMeter.update state.Downloaded downMeter
+                RateMeter.update state.Uploaded upMeter
                 let nextState =
                     { state with
-                        DownRate = downMeter |> RateMeter.averageSmoothed
-                        UpRate   = upMeter |> RateMeter.averageSmoothed }
+                        DownRate = RateMeter.averageSmoothed downMeter
+                        UpRate   = RateMeter.averageSmoothed upMeter }
                 notifiedRef <! RateChanged (nextState.DownRate, nextState.UpRate)
-                match state, nextState.DownRate, nextState.UpRate with
-                | { Status = Stopped }, downRate, upRate when downRate.Equals(Rate.zero) && upRate.Equals(Rate.zero) ->
+                match state with
+                | { Status = Stopped } when nextState.DownRate.Equals(Rate.zero) && nextState.UpRate.Equals(Rate.zero) ->
                     () // We're in a stopped state and the rates are at 0, so we can stop measuring.
                 | _ ->
                     mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(MeasureRateIntervalSec), mailbox.Self, MeasureRate)
@@ -177,30 +190,6 @@ module Torrent =
 
         and handleIOCommandResult downMeter upMeter (state: State) result =
             match result with
-            | IO.DirsCreateSuccess createdDirs ->
-                logDebug mailbox $"Created directories %A{createdDirs})"
-                match state with
-                | { Status = Started } ->
-                    logDebug mailbox $"Announcing '%A{Some Tracker.Started}' on %s{state.Announce}"
-                    let args: Announcer.AnnounceArgs =
-                         { Url        = state.Announce
-                           InfoHash   = state.InfoHash
-                           PeerId     = state.PeerId
-                           Port       = state.Settings.Port
-                           Downloaded = state.Downloaded
-                           Uploaded   = state.Uploaded
-                           Left       = state.Left
-                           Event      = Some Announcer.Started
-                           NumWant    = Some state.Settings.MaxSeedCount }
-                    announcerRef <! Announcer.Announce args
-                    receive downMeter upMeter state
-                | _ ->
-                    logDebug mailbox $"Not announcing '%A{Some Tracker.Started}' torrent not in started state anymore"
-                    receive downMeter upMeter state
-            | IO.DirsCreateFailure error ->
-                logError mailbox $"Failed to create directories %A{error}"
-                notifiedRef <! StatusChanged Errored
-                receive downMeter upMeter { state with Status = Errored }
             | IO.PieceWriteSuccess idx ->
                 logDebug mailbox $"Wrote piece %d{idx}"
                 for ref in mailbox.Context.GetPeers() do
@@ -213,17 +202,7 @@ module Torrent =
                 if nextState.Bitfield |> Bitfield.isFull then
                     logInfo mailbox "All pieces leeched"
                     logDebug mailbox $"Announcing '%A{Some Tracker.Completed}' on %s{state.Announce}"
-                    let args: Announcer.AnnounceArgs =
-                         { Url        = state.Announce
-                           InfoHash   = state.InfoHash
-                           PeerId     = state.PeerId
-                           Port       = state.Settings.Port
-                           Downloaded = state.Downloaded
-                           Uploaded   = state.Uploaded
-                           Left       = state.Left
-                           Event      = Some Announcer.Completed
-                           NumWant    = None }
-                    announcerRef <! Announcer.Announce args
+                    announcerRef <! Announcer.Announce (createCompletedAnnounceArgs state)
                 else
                     logInfo mailbox $"%d{nextState.Bitfield.Capacity - nextState.Bitfield.Count} pieces left to leech"
                 receive downMeter upMeter nextState 
@@ -253,17 +232,7 @@ module Torrent =
                             logInfo mailbox $"Connecting to %A{peer.Address}:%d{peer.Port}"
                             connectorRef <! Connector.Connect (peer.Address, peer.Port, Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray()))
                         logDebug mailbox $"Scheduling re-announce after '%.2f{float interval} sec' on %s{state.Announce}"
-                        let args: Announcer.AnnounceArgs =
-                             { Url        = state.Announce
-                               InfoHash   = state.InfoHash
-                               PeerId     = state.PeerId
-                               Port       = state.Settings.Port
-                               Downloaded = state.Downloaded
-                               Uploaded   = state.Uploaded
-                               Left       = state.Left
-                               Event      = None
-                               NumWant    = Some state.Settings.MaxSeedCount }
-                        announcerRef <! Announcer.ScheduleAnnounce (args, float interval)
+                        announcerRef <! Announcer.ScheduleAnnounce ((createRefreshedAnnounceArgs state), float interval)
                         receive downMeter upMeter state
                     | _ ->
                         logDebug mailbox "Not connecting to peers or scheduling re-announce"
@@ -276,17 +245,7 @@ module Torrent =
                 match eventOpt with
                 | None ->
                     logDebug mailbox $"Scheduling re-announce after '%.2f{AnnounceRetryDelaySec} sec' on %s{state.Announce}"
-                    let args: Announcer.AnnounceArgs =
-                         { Url        = state.Announce
-                           InfoHash   = state.InfoHash
-                           PeerId     = state.PeerId
-                           Port       = state.Settings.Port
-                           Downloaded = state.Downloaded
-                           Uploaded   = state.Uploaded
-                           Left       = state.Left
-                           Event      = eventOpt
-                           NumWant    = Some state.Settings.MaxSeedCount }
-                    announcerRef <! Announcer.ScheduleAnnounce (args, AnnounceRetryDelaySec)
+                    announcerRef <! Announcer.ScheduleAnnounce ((createAnnounceArgs state eventOpt), AnnounceRetryDelaySec)
                     receive downMeter upMeter state
                 | Some Announcer.Started ->
                     notifiedRef <! StatusChanged Errored
@@ -347,6 +306,10 @@ module Torrent =
         and handleTerminatedMessage downMeter upMeter (state: State) message =
             logDebug mailbox $"Peer %A{message.ActorRef.Path.Name} terminated (%d{mailbox.Context.GetPeers().Count()} peers left running)"
             piecesRef <! Pieces.RemovePeerBitfield message.ActorRef.Path.Name
+            receive downMeter upMeter state
+        
+        and unhandled downMeter upMeter (state: State) message =
+            mailbox.Unhandled(message)
             receive downMeter upMeter state
         
         receive (RateMeter.createFromBytes initialState.Downloaded) (RateMeter.createFromBytes initialState.Uploaded) initialState
