@@ -104,8 +104,7 @@ module Client =
                 return! handleTerminatedMessage state message
             
             | message ->
-                mailbox.Unhandled(message)
-                return! receive state }
+                return! unhandled state message }
         
         and handleTorrentCommand (state: State) command =
             match command with
@@ -206,6 +205,10 @@ module Client =
             | true, ref -> ref <! WatchedTorrentChanged None
             | _ -> ()
             state.Torrents.Remove(message.ActorRef.Path.Name) |> ignore
+            receive state
+        
+        and unhandled (state: State) message =
+            mailbox.Unhandled(message)
             receive state
         
         receive initialState

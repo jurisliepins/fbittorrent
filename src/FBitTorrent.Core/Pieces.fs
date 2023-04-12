@@ -148,8 +148,7 @@ module Pieces =
                 return! handleRequest state request
 
             | message ->
-                mailbox.Unhandled(message)
-                return! receive state }
+                return! unhandled state message }
 
             and handleCommand (state: State) command =
                 match command with
@@ -241,6 +240,11 @@ module Pieces =
                     | _ ->
                         logError mailbox $"Failed to find piece peer %s{mailbox.Context.Sender.Path.Name} bitfield doesn't exist"
                     receive state
+                    
+            and unhandled (state: State) message =
+                mailbox.Unhandled(message)
+                receive state
+                    
         receive initialState
     
     let defaultActorFn notifiedRef initialState mailbox =

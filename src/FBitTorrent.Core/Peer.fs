@@ -150,8 +150,7 @@ module Peer =
                 return! handleWriteResult pipeline leechOpt downMeter upMeter state result
                         
             | message ->
-                mailbox.Unhandled(message)
-                return! receive pipeline leechOpt downMeter upMeter state }
+                return! unhandled pipeline leechOpt downMeter upMeter state message }
         
         and handleCommand pipeline leechOpt downMeter upMeter (state: State) command =
             match command with
@@ -327,6 +326,10 @@ module Peer =
             match result with
             | Writer.Success     _ -> ()
             | Writer.Failure error -> notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
+            receive pipeline leechOpt downMeter upMeter state
+        
+        and unhandled pipeline leechOpt downMeter upMeter (state: State) message =
+            mailbox.Unhandled(message)
             receive pipeline leechOpt downMeter upMeter state
         
         mailbox.Self <! Read

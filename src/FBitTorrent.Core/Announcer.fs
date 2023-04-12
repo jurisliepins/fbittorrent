@@ -53,21 +53,20 @@ module Announcer =
                 return! handleCommand command
             
             | message ->
-                mailbox.Unhandled(message)
-                return! receive () }
+                return! unhandled message }
         
         and handleCommand command =
             match command with
-            | Announce ({
-                Url        = url
-                InfoHash   = ih
-                PeerId     = pid
-                Port       = port
-                Downloaded = downloaded
-                Uploaded   = uploaded
-                Left       = left
-                Event      = eventOpt
-                NumWant    = numWantOpt }) ->
+            | Announce
+                { Url        = url
+                  InfoHash   = ih
+                  PeerId     = pid
+                  Port       = port
+                  Downloaded = downloaded
+                  Uploaded   = uploaded
+                  Left       = left
+                  Event      = eventOpt
+                  NumWant    = numWantOpt } ->
                 try
                     match Tracker.defaultAnnounce url ih pid port downloaded uploaded left (eventOpt |> Option.map (fun event -> event.ToTrackerEvent())) numWantOpt query with
                     | { Complete   = complete
@@ -87,6 +86,10 @@ module Announcer =
             | ScheduleAnnounce (args, afterSec) ->
                 mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(afterSec), mailbox.Self, Announce args, mailbox.Context.Sender)
                 receive () 
+        
+        and unhandled message =
+            mailbox.Unhandled(message)
+            receive () 
         
         receive ()
         

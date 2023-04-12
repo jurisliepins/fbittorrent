@@ -47,8 +47,7 @@ module Connector =
                 return! handleCommand command
                     
             | message ->
-                mailbox.Unhandled(message)
-                return! receive () }
+                return! unhandled message }
         
         and handleCommand command =
             match command with
@@ -61,6 +60,10 @@ module Connector =
                         return Failure (address, port, Exception($"Failed to connect to %A{address}:%d{port}", exn)) }
                 ).PipeTo(mailbox.Context.Sender) |> ignore
                 receive ()
+        
+        and unhandled message =
+            mailbox.Unhandled(message)
+            receive ()
         
         receive ()
         
