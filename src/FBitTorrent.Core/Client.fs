@@ -131,7 +131,6 @@ module Client =
                 match mailbox.Context.GetTorrent(ih) with
                 | ref when not (ref.IsNobody()) ->
                     ref <! Torrent.Start
-                    ref <! Torrent.MeasureRate
                     mailbox.Context.Sender <! Success (Some ih, "Torrent started")
                 | _ ->
                     mailbox.Context.Sender <! Failure (Some ih, "Torrent not found")

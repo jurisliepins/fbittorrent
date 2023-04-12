@@ -99,7 +99,7 @@ module Torrent =
           Uploaded   = state.Uploaded
           Left       = state.Left
           Event      = eventOpt
-          NumWant    = None }
+          NumWant    = Some state.Settings.MaxSeedCount }
     
     let private createStartedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
         createAnnounceArgs state (Some Announcer.Started)
@@ -124,11 +124,11 @@ module Torrent =
             | :? Command as command -> 
                 return! handleCommand downMeter upMeter state command
             
-            | :? IO.CommandResult as result ->
-                return! handleIOCommandResult downMeter upMeter state result
-                
             | :? Announcer.CommandResult as result ->
                 return! handleAnnouncerCommandResult downMeter upMeter state result
+            
+            | :? IO.CommandResult as result ->
+                return! handleIOCommandResult downMeter upMeter state result
             
             | :? Connector.CommandResult as result ->
                 return! handleConnectorCommandResult downMeter upMeter state result
@@ -153,6 +153,7 @@ module Torrent =
                     logDebug mailbox $"Announcing '%A{Some Tracker.Started}' on %s{state.Announce}"
                     announcerRef <! Announcer.Announce (createStartedAnnounceArgs state)
                     notifiedRef <! StatusChanged Started
+                    mailbox.Self <! MeasureRate
                     logInfo mailbox "Started"
                     receive downMeter upMeter { state with Status = Started }
                 | _ ->
@@ -182,34 +183,12 @@ module Torrent =
                         UpRate   = RateMeter.averageSmoothed upMeter }
                 notifiedRef <! RateChanged (nextState.DownRate, nextState.UpRate)
                 match state with
-                | { Status = Stopped } when nextState.DownRate.Equals(Rate.zero) && nextState.UpRate.Equals(Rate.zero) ->
-                    () // We're in a stopped state and the rates are at 0, so we can stop measuring.
+                | { Status = Stopped } when
+                    nextState.DownRate.Equals(Rate.zero) &&
+                    nextState.UpRate.Equals(Rate.zero) -> () // We're in a stopped state and the rates are at 0, so we can stop measuring.
                 | _ ->
                     mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(MeasureRateIntervalSec), mailbox.Self, MeasureRate)
                 receive downMeter upMeter nextState
-
-        and handleIOCommandResult downMeter upMeter (state: State) result =
-            match result with
-            | IO.PieceWriteSuccess idx ->
-                logDebug mailbox $"Wrote piece %d{idx}"
-                for ref in mailbox.Context.GetPeers() do
-                    ref <! Peer.PieceLeeched idx
-                state.Bitfield |> Bitfield.setBit idx true
-                notifiedRef <! BitfieldChanged (BitfieldBitChange idx)
-                let nextState =
-                    { state with Left = state.Left - int64 state.Pieces[idx].Length }
-                notifiedRef <! BytesChanged (nextState.Downloaded, nextState.Uploaded, nextState.Left)
-                if nextState.Bitfield |> Bitfield.isFull then
-                    logInfo mailbox "All pieces leeched"
-                    logDebug mailbox $"Announcing '%A{Some Tracker.Completed}' on %s{state.Announce}"
-                    announcerRef <! Announcer.Announce (createCompletedAnnounceArgs state)
-                else
-                    logInfo mailbox $"%d{nextState.Bitfield.Capacity - nextState.Bitfield.Count} pieces left to leech"
-                receive downMeter upMeter nextState 
-            | IO.PieceWriteFailure (idx, error) ->
-                logError mailbox $"Failed to write piece %d{idx} %A{error}"
-                notifiedRef <! StatusChanged Errored
-                receive downMeter upMeter { state with Status = Errored }
         
         and handleAnnouncerCommandResult downMeter upMeter (state: State) result =
             match result with
@@ -254,6 +233,29 @@ module Torrent =
                 | Some Announcer.Completed ->
                     receive downMeter upMeter state
         
+        and handleIOCommandResult downMeter upMeter (state: State) result =
+            match result with
+            | IO.PieceWriteSuccess idx ->
+                logDebug mailbox $"Wrote piece %d{idx}"
+                for ref in mailbox.Context.GetPeers() do
+                    ref <! Peer.PieceLeeched idx
+                state.Bitfield |> Bitfield.setBit idx true
+                notifiedRef <! BitfieldChanged (BitfieldBitChange idx)
+                let nextState =
+                    { state with Left = state.Left - int64 state.Pieces[idx].Length }
+                notifiedRef <! BytesChanged (nextState.Downloaded, nextState.Uploaded, nextState.Left)
+                if nextState.Bitfield |> Bitfield.isFull then
+                    logInfo mailbox "All pieces leeched"
+                    logDebug mailbox $"Announcing '%A{Some Tracker.Completed}' on %s{state.Announce}"
+                    announcerRef <! Announcer.Announce (createCompletedAnnounceArgs state)
+                else
+                    logInfo mailbox $"%d{nextState.Bitfield.Capacity - nextState.Bitfield.Count} pieces left to leech"
+                receive downMeter upMeter nextState 
+            | IO.PieceWriteFailure (idx, error) ->
+                logError mailbox $"Failed to write piece %d{idx} %A{error}"
+                notifiedRef <! StatusChanged Errored
+                receive downMeter upMeter { state with Status = Errored }
+        
         and handleConnectorCommandResult downMeter upMeter (state: State) result =
             match result with
             | Connector.Success (connection, _) ->
@@ -261,12 +263,8 @@ module Torrent =
                 | { Status = Started } ->
                     if mailbox.Context.GetPeers().Count() < state.Settings.MaxSeedCount then
                         let actorName = Peer.actorName connection.RemoteEndpoint.Address connection.RemoteEndpoint.Port
-                        let actorFn = peerFn mailbox.Self piecesRef (createMessageConnection connection) (Peer.createState state.Bitfield.Capacity)
-                        let ref = monitor (spawn mailbox actorName actorFn) mailbox
-                        ref <! Peer.Read
-                        ref <! Peer.Leech (Some (Bitfield.createFromBitfield state.Bitfield))
-                        ref <! Peer.KeepAlive
-                        ref <! Peer.MeasureRate
+                        let actorFn = peerFn mailbox.Self piecesRef (createMessageConnection connection) (Peer.createState (Bitfield.createFromBitfield state.Bitfield) (Bitfield.create state.Bitfield.Capacity))
+                        let _ = monitor (spawn mailbox actorName actorFn) mailbox
                         piecesRef <! Pieces.AddPeerBitfield (actorName, Bitfield.create state.Bitfield.Capacity)
                         logInfo mailbox $"Connected to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port}"
                         receive downMeter upMeter state
@@ -311,7 +309,7 @@ module Torrent =
         and unhandled downMeter upMeter (state: State) message =
             mailbox.Unhandled(message)
             receive downMeter upMeter state
-        
+
         receive (RateMeter.createFromBytes initialState.Downloaded) (RateMeter.createFromBytes initialState.Uploaded) initialState
     
     let defaultActorFn notifiedRef initialState (mailbox: Actor<obj>) =
