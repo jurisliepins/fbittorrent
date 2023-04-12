@@ -13,8 +13,8 @@ module Peer =
         type Command = Read
         
         type ReadResult =
-            | Success of Result: Message
-            | Failure of Error:  Exception
+            | Success of Message
+            | Failure of Exception
         
         let actorName () = "reader"
         
@@ -34,6 +34,7 @@ module Peer =
                     Async.StartAsTask(async {
                        try
                            let! message = connection.AsyncReadMessage()
+                           mailbox.Self <! Read
                            return Success message
                        with exn ->
                            return Failure (Exception("Failed to read from connection", exn)) }
@@ -46,8 +47,7 @@ module Peer =
         type Command = Write of Message
         
         type WriteResult =
-            | Success
-            | Failure of Error: Exception
+            | Failure of Exception
         
         let actorName () = "writer"
         
@@ -66,7 +66,6 @@ module Peer =
                 | Write message ->
                     try
                         connection.WriteMessage(message)
-                        ref <! Success
                     with exn ->
                         ref <! Failure (Exception("Failed to write to the connection", exn))
                     receive ()
@@ -79,9 +78,9 @@ module Peer =
     
     type State =
         { SelfBitfield:   Bitfield
-          PeerBitfield:   Bitfield
           SelfChoking:    bool
           SelfInterested: bool
+          PeerBitfield:   Bitfield
           PeerChoking:    bool
           PeerInterested: bool
           Downloaded:     int64
@@ -91,9 +90,9 @@ module Peer =
 
     let createState (selfBitfield: Bitfield) (peerBitfield: Bitfield) =
         { SelfBitfield   = selfBitfield
-          PeerBitfield   = peerBitfield
           SelfChoking    = true
           SelfInterested = false
+          PeerBitfield   = peerBitfield
           PeerChoking    = true
           PeerInterested = false
           Downloaded     = 0L
@@ -232,13 +231,11 @@ module Peer =
             | Reader.Success message ->
                 match message with
                 | KeepAliveMessage ->
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter state
                 
                 | ChokeMessage ->
                     let nextState = { state with PeerChoking = true }
                     notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter nextState
                 | UnChokeMessage ->
                     let nextState = { state with PeerChoking = false }
@@ -253,18 +250,15 @@ module Peer =
                         // We were idle when we got un-choked (usually the first un-choke for this peer), so we need to
                         // request for a new piece to start leeching. 
                         piecesRef <! Pieces.Request.LeechPiece
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter nextState
                 
                 | InterestedMessage ->
                     let nextState = { state with PeerInterested = true }
                     notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter nextState
                 | NotInterestedMessage ->
                     let nextState = { state with PeerInterested = false }
                     notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter nextState
                 
                 | HaveMessage idx ->
@@ -279,7 +273,6 @@ module Peer =
                     | None, { PeerChoking = false } ->
                         piecesRef <! Pieces.Request.LeechPiece
                     | _ -> ()
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter state
                 
                 | BitfieldMessage bytes ->
@@ -287,7 +280,6 @@ module Peer =
                         state.PeerBitfield |> Bitfield.setBytes bytes
                         notifiedRef <! BitfieldChanged (BitfieldBytesChange bytes)
                         piecesRef <! Pieces.BitfieldBytesReceived bytes 
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter state
                 
                 | PieceMessage (idx, beg, block) ->
@@ -300,22 +292,17 @@ module Peer =
                         if BlockResponses.isAllResponded responses then
                             piecesRef <! Pieces.PieceLeeched (idx, BlockResponses.toPiece responses)
                             piecesRef <! Pieces.Request.LeechPiece
-                            readerRef <! Reader.Read
                             receive (BlockPipeline.update block.Length pipeline) None downMeter upMeter nextState
                         elif BlockRequests.isAllRequested requests then
-                            readerRef <! Reader.Read
                             receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState
                         else
                             mailbox.Self <! Leech NextLeech
-                            readerRef <! Reader.Read
                             receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState
                     | _ ->
-                        readerRef <! Reader.Read
                         receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState
             
                 | message ->
                     mailbox.Unhandled(message)
-                    readerRef <! Reader.Read
                     receive pipeline leechOpt downMeter upMeter state
                     
             | Reader.Failure error ->
@@ -324,7 +311,6 @@ module Peer =
             
         and handleWriteResult pipeline leechOpt downMeter upMeter (state: State) result =
             match result with
-            | Writer.Success     _ -> ()
             | Writer.Failure error -> notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
             receive pipeline leechOpt downMeter upMeter state
         

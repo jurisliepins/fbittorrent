@@ -111,7 +111,6 @@ module IO =
                     with exn ->
                         logError mailbox $"Failed to release piece %d{idx} %A{exn}"
                     receive state
-                    
                 | { Status = Uninitialised } ->
                     try
                         createDirs fs state.RootDirPath state.DirPaths
