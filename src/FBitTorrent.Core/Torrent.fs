@@ -73,10 +73,12 @@ module Torrent =
           DownRate    = Rate.zero
           UpRate      = Rate.zero }
         
+    type private Action =
+        | MeasureRate
+        
     type Command =
         | Start
         | Stop
-        | MeasureRate
     
     type BitfieldChange =
         | BitfieldBytesChange of Bytes: byte[]
@@ -121,6 +123,9 @@ module Torrent =
         let piecesRef = spawn mailbox (Pieces.actorName ()) (piecesFn mailbox.Self (Pieces.createState initialState.Bitfield initialState.Pieces))
         let rec receive (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
+            | :? Action as action -> 
+                return! handleAction downMeter upMeter state action
+            
             | :? Command as command -> 
                 return! handleCommand downMeter upMeter state command
             
@@ -144,6 +149,23 @@ module Torrent =
             
             | message ->
                 return! unhandled downMeter upMeter state message }
+        
+        and handleAction downMeter upMeter (state: State) action =
+            match action with
+            | MeasureRate ->
+                RateMeter.update state.Downloaded downMeter
+                RateMeter.update state.Uploaded upMeter
+                let nextState =
+                    { state with
+                        DownRate = RateMeter.averageSmoothed downMeter
+                        UpRate   = RateMeter.averageSmoothed upMeter }
+                notifiedRef <! RateChanged (nextState.DownRate, nextState.UpRate)
+                match state with
+                | { Status = Stopped } when nextState.DownRate.Equals(Rate.zero) && nextState.UpRate.Equals(Rate.zero) ->
+                    () // We're in a stopped state and the rates are at 0, so we can stop measuring.
+                | _ ->
+                    mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(MeasureRateIntervalSec), mailbox.Self, MeasureRate)
+                receive downMeter upMeter nextState
         
         and handleCommand downMeter upMeter (state: State) command =
             match command with
@@ -174,21 +196,6 @@ module Torrent =
                 | _ ->
                     logDebug mailbox "Torrent already stopped"
                     receive downMeter upMeter state
-            | MeasureRate ->
-                RateMeter.update state.Downloaded downMeter
-                RateMeter.update state.Uploaded upMeter
-                let nextState =
-                    { state with
-                        DownRate = RateMeter.averageSmoothed downMeter
-                        UpRate   = RateMeter.averageSmoothed upMeter }
-                notifiedRef <! RateChanged (nextState.DownRate, nextState.UpRate)
-                match state with
-                | { Status = Stopped } when
-                    nextState.DownRate.Equals(Rate.zero) &&
-                    nextState.UpRate.Equals(Rate.zero) -> () // We're in a stopped state and the rates are at 0, so we can stop measuring.
-                | _ ->
-                    mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(MeasureRateIntervalSec), mailbox.Self, MeasureRate)
-                receive downMeter upMeter nextState
         
         and handleAnnouncerCommandResult downMeter upMeter (state: State) result =
             match result with

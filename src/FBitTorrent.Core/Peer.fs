@@ -100,11 +100,11 @@ module Peer =
           DownRate       = Rate.zero
           UpRate         = Rate.zero }
     
-    type LeechType =
+    type private LeechType =
         | FirstLeech
         | NextLeech
     
-    type Command =
+    type private Action =
         | Read
         | Leech of LeechType
         | KeepAlive
@@ -137,8 +137,8 @@ module Peer =
         let writerRef = spawn mailbox (Writer.actorName ()) (Writer.actorFn connection mailbox.Self)
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
-            | :? Command as command ->
-                return! handleCommand pipeline leechOpt downMeter upMeter state command
+            | :? Action as action ->
+                return! handleAction pipeline leechOpt downMeter upMeter state action
             
             | :? Message as message ->
                 return! handleMessage pipeline leechOpt downMeter upMeter state message
@@ -155,8 +155,8 @@ module Peer =
             | message ->
                 return! unhandled pipeline leechOpt downMeter upMeter state message }
         
-        and handleCommand pipeline leechOpt downMeter upMeter (state: State) command =
-            match command with
+        and handleAction pipeline leechOpt downMeter upMeter (state: State) action =
+            match action with
             | Read ->
                 readerRef <! Reader.Read
                 receive pipeline leechOpt downMeter upMeter state

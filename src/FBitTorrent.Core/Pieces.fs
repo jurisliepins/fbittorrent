@@ -114,8 +114,8 @@ module Pieces =
           PeerBitfields = Dictionary() }
     
     type Message =
-        | PeerJoined            of Peer: string * Bitfield: Bitfield
-        | PeerLeft              of Peer: string
+        | PeerJoined            of PeerName: string * Bitfield: Bitfield
+        | PeerLeft              of PeerName: string
         | PieceLeeched          of Id: int * Data: ByteBuffer
         | BitfieldBytesReceived of Bytes: byte[]
         | BitfieldBitReceived   of Bit: int
