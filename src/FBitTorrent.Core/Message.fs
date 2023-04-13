@@ -103,17 +103,6 @@ with
         | CancelMessage   (idx, beg, length) -> $"Cancel(index=%d{idx},begin=%d{beg},length=%d{length})"
         | PortMessage     port               -> $"Port(listenPort=%d{port})"
 
-type IMessageConnection =
-    inherit IConnection
-    abstract member WriteMessage: Message * int -> unit
-    abstract member ReadMessage: int -> Message
-    abstract member AsyncWriteMessage: Message * int -> Async<unit>
-    abstract member AsyncReadMessage: int -> Async<Message>
-    abstract member WriteMessage: Message -> unit
-    abstract member ReadMessage: unit -> Message
-    abstract member AsyncWriteMessage: Message -> Async<unit>
-    abstract member AsyncReadMessage: unit -> Async<Message>
-
 module Message =
 
     let [<Literal>] DefaultWriteTimeoutMillis = 120_000
@@ -384,21 +373,3 @@ module Message =
         
     let fromString (string: string) =
         fromBytes (Encoding.Latin1.GetBytes(string))
-
-    let createConnection (connection: IConnection) =
-        { new IMessageConnection with
-            member _.Stream with get() = connection.Stream
-            member _.Writer with get() = connection.Writer
-            member _.Reader with get() = connection.Reader
-            member _.RemoteEndpoint with get() = connection.RemoteEndpoint
-            member _.LocalEndpoint with get() = connection.LocalEndpoint
-            member _.Disconnect() = connection.Disconnect()
-            member _.Dispose() = connection.Dispose()
-            member _.WriteMessage(message: Message, timeoutMillis: int) = connection.Stream.WriteTimeout <- timeoutMillis; write connection.Writer message
-            member _.ReadMessage(timeoutMillis: int) = connection.Stream.ReadTimeout <- timeoutMillis; read connection.Reader
-            member _.AsyncWriteMessage(message: Message, timeoutMillis: int) = connection.Stream.WriteTimeout <- timeoutMillis; asyncWrite connection.Writer message
-            member _.AsyncReadMessage(timeoutMillis: int) = connection.Stream.ReadTimeout <- timeoutMillis; asyncRead connection.Reader
-            member __.WriteMessage(message: Message) = __.WriteMessage(message, DefaultWriteTimeoutMillis)
-            member __.ReadMessage() = __.ReadMessage(DefaultReadTimeoutMillis)
-            member __.AsyncWriteMessage(message: Message) = __.AsyncWriteMessage(message, DefaultWriteTimeoutMillis)
-            member __.AsyncReadMessage() = __.AsyncReadMessage(DefaultReadTimeoutMillis) }

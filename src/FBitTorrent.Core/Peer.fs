@@ -9,7 +9,17 @@ open Akka.Actor
 open FBitTorrent.Core
 
 module Peer =
+    
     module Connection =
+        
+        type State =
+            { SelfHandshake: Handshake
+              PeerHandshake: Handshake option }
+        
+        let createState (selfHandshake: Handshake) =
+            { SelfHandshake = selfHandshake
+              PeerHandshake = None }
+        
         type private Action = Read
         
         type Command =
@@ -24,46 +34,55 @@ module Peer =
         
         let actorName () = "connection"
         
-        let actorFn (connection: IMessageConnection) notifiedRef (mailbox: Actor<obj>) =
+        let actorFn (connection: IConnection) notifiedRef (initialState: State) (mailbox: Actor<obj>) =
             mailbox.Defer(connection.Dispose)
-            let rec receive () = actor {
+            let rec receive (state: State) = actor {
                 match! mailbox.Receive() with
                 | :? Action as action ->
-                    return! handleAction action
+                    return! handleAction state action
                 
                 | :? Command as command ->
-                    return! handleCommand command
+                    return! handleCommand state command
                     
                 | message ->
-                    mailbox.Unhandled(message)
-                    return! receive () }
+                    return! unhandled state message }
             
-            and handleAction action = 
+            and handleAction (state: State) action = 
                 match action with
                 | Read -> 
                     Async.StartAsTask(async {
                        try
-                           let! message = connection.AsyncReadMessage()
+                           let! message = Message.asyncRead connection.Reader
                            mailbox.Self <! Read
                            return ReadMessage message
                        with exn ->
-                           return ReadFailure (Exception("Failed to read from connection", exn)) }
+                           return ReadFailure (Exception("Failed to read message", exn)) }
                     ).PipeTo(notifiedRef) |> ignore
-                    receive ()
+                    receive state
             
-            and handleCommand command =
+            and handleCommand (state: State) command =
                 match command with
                 | WriteMessage message ->
                     try
-                        connection.WriteMessage(message)
+                        Message.write connection.Writer message
                     with exn ->
                         mailbox.Context.Sender <! WriteFailure (Exception("Failed to write message", exn))
-                receive ()
+                receive state
+                
+            and unhandled (state: State) message =
+                mailbox.Unhandled(message)
+                receive state 
             
             mailbox.Self <! Read
             
-            receive ()
-
+            receive initialState
+            
+        let defaultActorFn connection notifiedRef mailbox = actorFn connection notifiedRef mailbox
+        
+    module ConnectionExtensions =
+        type IActorContext with
+            member __.GetConnection() : IActorRef = __.Child(Connection.actorName ())
+//----------------------------------------------------------------------------------------------------------------------    
     let [<Literal>] KeepAliveIntervalSec = 30.0
     
     let [<Literal>] MeasureRateIntervalSec = 1.0
@@ -121,9 +140,9 @@ module Peer =
     
     let actorName (address: IPAddress) (port: int) = $"peer-%A{address}:%d{port}"
     
-    let actorFn notifiedRef piecesRef (connection: IMessageConnection) (initialState: State) (mailbox: Actor<obj>) =
+    let actorFn connectionFn notifiedRef piecesRef (connection: IConnection) (selfHandshake: Handshake) (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
-        let connectionRef = spawn mailbox (Connection.actorName ()) (Connection.actorFn connection mailbox.Self)
+        let connectionRef = spawn mailbox (Connection.actorName ()) (connectionFn connection mailbox.Self (Connection.createState selfHandshake))
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action ->
@@ -316,7 +335,7 @@ module Peer =
         receive (BlockPipeline.create ()) None (RateMeter.create ()) (RateMeter.create ()) initialState
             
     let defaultActorFn notifiedRef piecesRef connection initialState mailbox =
-        actorFn notifiedRef piecesRef connection initialState mailbox
+        actorFn Connection.actorFn notifiedRef piecesRef connection initialState mailbox
 
 module PeerExtensions =
     type IActorContext with

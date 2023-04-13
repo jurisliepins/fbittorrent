@@ -115,7 +115,7 @@ module Torrent =
     let private createRefreshedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
         createAnnounceArgs state None
     
-    let actorFn createMessageConnection announcerFn connectorFn piecesFn ioFn peerFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
+    let actorFn announcerFn connectorFn piecesFn ioFn peerFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
         let announcerRef = spawn mailbox (Announcer.actorName ()) announcerFn
         let connectorRef = spawn mailbox (Connector.actorName ()) connectorFn
@@ -270,7 +270,7 @@ module Torrent =
                 | { Status = Started } ->
                     if mailbox.Context.GetPeers().Count() < state.Settings.MaxSeedCount then
                         let actorName = Peer.actorName connection.RemoteEndpoint.Address connection.RemoteEndpoint.Port
-                        let actorFn = peerFn mailbox.Self piecesRef (createMessageConnection connection) (Peer.createState (Bitfield.createFromBitfield state.Bitfield) (Bitfield.create state.Bitfield.Capacity))
+                        let actorFn = peerFn mailbox.Self piecesRef connection (Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray())) (Peer.createState (Bitfield.createFromBitfield state.Bitfield) (Bitfield.create state.Bitfield.Capacity))
                         let _ = monitor (spawn mailbox actorName actorFn) mailbox
                         piecesRef <! Pieces.PeerJoined (actorName, Bitfield.create state.Bitfield.Capacity)
                         logInfo mailbox $"Connected to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port}"
@@ -317,7 +317,7 @@ module Torrent =
         receive (RateMeter.createFromBytes initialState.Downloaded) (RateMeter.createFromBytes initialState.Uploaded) initialState
     
     let defaultActorFn notifiedRef initialState (mailbox: Actor<obj>) =
-        actorFn Message.createConnection Announcer.defaultActorFn Connector.defaultActorFn Pieces.defaultActorFn IO.defaultActorFn Peer.defaultActorFn notifiedRef initialState mailbox
+        actorFn Announcer.defaultActorFn Connector.defaultActorFn Pieces.defaultActorFn IO.defaultActorFn Peer.defaultActorFn notifiedRef initialState mailbox
         
 module TorrentExtensions =
     type IActorContext with
