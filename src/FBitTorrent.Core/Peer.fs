@@ -16,7 +16,7 @@ module Peer =
             | WriteMessage of Message: Message
         
         type CommandResult =
-            | WriteMessageFailure of Error: Exception
+            | WriteFailure of Error: Exception
         
         type Notification =
             | ReadMessage of Message: Message
@@ -57,7 +57,7 @@ module Peer =
                     try
                         connection.WriteMessage(message)
                     with exn ->
-                        mailbox.Context.Sender <! WriteMessageFailure (Exception("Failed to write message", exn))
+                        mailbox.Context.Sender <! WriteFailure (Exception("Failed to write message", exn))
                 receive ()
             
             mailbox.Self <! Read
@@ -218,7 +218,7 @@ module Peer =
 
         and handleConnectionCommandResult pipeline leechOpt downMeter upMeter (state: State) result =
             match result with
-            | Connection.WriteMessageFailure error ->
+            | Connection.WriteFailure error ->
                 notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
             receive pipeline leechOpt downMeter upMeter state
         
