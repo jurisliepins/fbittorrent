@@ -21,7 +21,7 @@ module Program =
         
     [<EntryPoint>]
     let main args =
-        Console.WriteLine($"%s{Application.AppName} v%.2f{Application.AppVersion} [%A{RuntimeInformation.ProcessArchitecture}] on %A{RuntimeInformation.OSDescription}")
+        Console.WriteLine($"%s{Constants.AppName} v%.2f{Constants.AppVersion} [%A{RuntimeInformation.ProcessArchitecture}] on %A{RuntimeInformation.OSDescription}")
         try
             runClient ()
         with exn ->

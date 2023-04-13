@@ -1,6 +1,6 @@
 namespace FBitTorrent.Core
 
-module Application =
+module Constants =
     
     let [<Literal>] AppName = "FBitTorrent"
     

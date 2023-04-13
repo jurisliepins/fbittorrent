@@ -37,12 +37,12 @@ module Announcer =
           Event:      AnnounceEvent option }
         
     type Command =
-        | Announce         of AnnounceArgs
-        | ScheduleAnnounce of AnnounceArgs * float 
+        | Announce         of Args: AnnounceArgs
+        | ScheduleAnnounce of Args: AnnounceArgs * AfterSec: float 
     
     type CommandResult =
-        | Success of AnnounceResult 
-        | Failure of Exception * AnnounceEvent option
+        | AnnounceSuccess of Result: AnnounceResult 
+        | AnnounceFailure of EventType: AnnounceEvent option * Error: Exception 
     
     let actorName () = "announcer"
     
@@ -73,14 +73,14 @@ module Announcer =
                         Incomplete = incomplete
                         Interval   = interval
                         Peers      = peers } -> 
-                        mailbox.Context.Sender <! Success {
+                        mailbox.Context.Sender <! AnnounceSuccess {
                            Complete   = complete
                            Incomplete = incomplete
                            Interval   = interval
                            Peers      = peers
                            Event      = eventOpt }
                 with exn -> 
-                    mailbox.Context.Sender <! Failure (Exception($"Failed to announce on %s{url}", exn), eventOpt)
+                    mailbox.Context.Sender <! AnnounceFailure (eventOpt, Exception($"Failed to announce on %s{url}", exn))
                 receive ()
             
             | ScheduleAnnounce (args, afterSec) ->

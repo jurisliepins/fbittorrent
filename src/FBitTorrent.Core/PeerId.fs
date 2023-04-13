@@ -23,4 +23,4 @@ type PeerId =
         | _ -> false
         
 module PeerId =
-    let create () = PeerId($"-FX%.2f{Application.AppVersion}-%012d{Random().NextInt64(0L, 1000000000000L)}")
+    let create () = PeerId($"-FX%.2f{Constants.AppVersion}-%012d{Random().NextInt64(0L, 1000000000000L)}")

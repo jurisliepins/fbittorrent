@@ -141,7 +141,7 @@ module Tracker =
     
     let httpQuery (url: string) =
         let client = new HttpClient()
-        client.DefaultRequestHeaders.UserAgent.ParseAdd($"%s{Application.AppName}/%.2f{Application.AppVersion}")
+        client.DefaultRequestHeaders.UserAgent.ParseAdd($"%s{Constants.AppName}/%.2f{Constants.AppVersion}")
         client.DefaultRequestHeaders.Accept.ParseAdd("*/*")
         client.DefaultRequestHeaders.Connection.ParseAdd("keep-alive")
         let response =

@@ -66,25 +66,25 @@ module Client =
           UpRate      = torrent.UpRate }
     
     type Command =
-        | Add           of Torrent.State
-        | Remove        of Hash
-        | Start         of Hash
-        | Stop          of Hash
-        | AttachWatcher of Hash * ICanTell
-        | DetachWatcher of Hash
+        | Add           of Torrent: Torrent.State
+        | Remove        of InfoHash: Hash
+        | Start         of InfoHash: Hash
+        | Stop          of InfoHash: Hash
+        | AttachWatcher of InfoHash: Hash * Watcher: ICanTell
+        | DetachWatcher of InfoHash: Hash
 
     type CommandResult =
-        | Success of (Hash option * string)
-        | Failure of (Hash option * string)
+        | Success of InfoHash: Hash option * ResultMessage: string
+        | Failure of InfoHash: Hash option * ResultMessage: string
     
     type Request =
-        | Get of Hash option
+        | Get of InfoHash: Hash option
             
     type Response =
-        | Get of Torrent list
+        | Get of Torrents: Torrent list
     
     type WatcherNotification =
-        | WatchedTorrentChanged of WatchedTorrent option
+        | WatchedTorrentChanged of Torrent: WatchedTorrent option
     
     let actorName () = "client"
     

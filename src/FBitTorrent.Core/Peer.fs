@@ -111,18 +111,22 @@ module Peer =
         | MeasureRate
     
     type Message =
-        | PieceLeeched of int
+        | PieceLeeched of Id: int
     
     type BitfieldChange =
-        | BitfieldBytesChange of byte[]
-        | BitfieldBitChange   of int
+        | BitfieldBytesChange of Bytes: byte[]
+        | BitfieldBitChange   of Bit: int
     
     type Notification =
-        | BitfieldChanged of BitfieldChange
-        | FlagsChanged    of bool * bool * bool * bool
-        | BytesChanged    of int64 * int64
-        | RateChanged     of Rate * Rate
-        | Failed          of Exception
+        | BitfieldChanged of Change: BitfieldChange
+        | FlagsChanged of
+            SelfChoking:    bool *
+            SelfInterested: bool *
+            PeerChoking:    bool *
+            PeerInterested: bool
+        | BytesChanged    of Downloaded: int64 * Uploaded: int64
+        | RateChanged     of Down: Rate * Up: Rate
+        | Failed          of Error: Exception
     
     let actorName (address: IPAddress) (port: int) = $"peer-%A{address}:%d{port}"
     
@@ -218,7 +222,7 @@ module Peer =
         
         and handlePiecesResponse pipeline leechOpt downMeter upMeter (state: State) response =
             match response with
-            | Pieces.Response.LeechPiece (idx, length) ->
+            | Pieces.Response.PieceToLeech (idx, length) ->
                 match leechOpt with
                 | Some _ ->
                     receive pipeline leechOpt downMeter upMeter state
@@ -249,7 +253,7 @@ module Peer =
                     | None ->
                         // We were idle when we got un-choked (usually the first un-choke for this peer), so we need to
                         // request for a new piece to start leeching. 
-                        piecesRef <! Pieces.Request.LeechPiece
+                        piecesRef <! Pieces.Request.PieceToLeech
                     receive pipeline leechOpt downMeter upMeter nextState
                 
                 | InterestedMessage ->
@@ -271,7 +275,7 @@ module Peer =
                     // that means we are getting a 'lazy bitfield' and need to ask for pieces as we receive 'have' messages.    
                     match leechOpt, state with
                     | None, { PeerChoking = false } ->
-                        piecesRef <! Pieces.Request.LeechPiece
+                        piecesRef <! Pieces.Request.PieceToLeech
                     | _ -> ()
                     receive pipeline leechOpt downMeter upMeter state
                 
@@ -291,7 +295,7 @@ module Peer =
                         BlockResponses.push { Beginning = beg; Data = block } responses
                         if BlockResponses.isAllResponded responses then
                             piecesRef <! Pieces.PieceLeeched (idx, BlockResponses.toPiece responses)
-                            piecesRef <! Pieces.Request.LeechPiece
+                            piecesRef <! Pieces.Request.PieceToLeech
                             receive (BlockPipeline.update block.Length pipeline) None downMeter upMeter nextState
                         elif BlockRequests.isAllRequested requests then
                             receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState

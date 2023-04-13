@@ -113,24 +113,21 @@ module Pieces =
           Pieces        = pieces
           PeerBitfields = Dictionary() }
     
-    type Command =
-        | AddPeerBitfield    of string * Bitfield
-        | RemovePeerBitfield of string
+    type Message =
+        | PeerJoined            of Peer: string * Bitfield: Bitfield
+        | PeerLeft              of Peer: string
+        | PieceLeeched          of Id: int * Data: ByteBuffer
+        | BitfieldBytesReceived of Bytes: byte[]
+        | BitfieldBitReceived   of Bit: int
     
     type Request =
-        | LeechPiece
+        | PieceToLeech
         
     type Response =
-        | LeechPiece of int * int
-    
-    type Message =
-        | PieceLeeched          of int * ByteBuffer
-        | BitfieldBytesReceived of byte[]
-        | BitfieldBitReceived   of int
+        | PieceToLeech of Id: int * Length: int
     
     type Notification =
-        | PieceLeechSuccess of int * ByteBuffer
-        | PieceLeechFailure of int * Exception
+        | PieceReceived of Id: int * Data: ByteBuffer
         
     let actorName () = "pieces"
     
@@ -138,9 +135,6 @@ module Pieces =
         logDebug mailbox $"Initial state \n%A{initialState}"
         let rec receive (state: State) = actor {
             match! mailbox.Receive() with
-            | :? Command as command ->
-                return! handleCommand state command
-            
             | :? Message as message ->
                 return! handleMessage state message
             
@@ -150,41 +144,36 @@ module Pieces =
             | message ->
                 return! unhandled state message }
 
-            and handleCommand (state: State) command =
-                match command with
-                | AddPeerBitfield (actorName, bitfield) ->
-                    if state.PeerBitfields.TryAdd(actorName, bitfield) then
-                        logDebug mailbox $"Peer %s{actorName} bitfield added"
-                    else
-                        logError mailbox $"Peer %s{actorName} bitfield already exists"
-                | RemovePeerBitfield actorName ->
-                    match state.PeerBitfields.TryGetValue(actorName) with
-                    | true, bitfield ->
-                        state.PieceSelector |> BitfieldSelector.subtractBitfield bitfield
-                        state.PeerBitfields.Remove(actorName) |> ignore
-                    | _ ->
-                        logError mailbox $"Peer %s{actorName} bitfield doesn't exist"
-                receive state
-            
             and handleMessage (state: State) message =
                 match message with
-                | PieceLeeched (idx, piece) ->
+                | PeerJoined (peerName, bitfield) ->
+                    if state.PeerBitfields.TryAdd(peerName, bitfield) then
+                        logDebug mailbox $"Peer %s{peerName} bitfield added"
+                    else
+                        logError mailbox $"Peer %s{peerName} bitfield already exists"
+                | PeerLeft peerName ->
+                    match state.PeerBitfields.TryGetValue(peerName) with
+                    | true, bitfield ->
+                        state.PieceSelector |> BitfieldSelector.subtractBitfield bitfield
+                        state.PeerBitfields.Remove(peerName) |> ignore
+                    | _ ->
+                        logError mailbox $"Peer %s{peerName} bitfield doesn't exist"
+                | PieceLeeched (idx, data) ->
                     if Bitfield.getBit idx state.RunningPieces then
                         // Piece is running means that we're waiting for it to complete.
-                        if state.Pieces[idx].Hash.Equals(SHA1.HashData(piece.AsReadOnlySpan()) |> Hash) then
+                        if state.Pieces[idx].Hash.Equals(SHA1.HashData(data.AsReadOnlySpan()) |> Hash) then
                             logDebug mailbox $"Leeched piece %d{idx} and hash is valid"
-                            notifiedRef <! PieceLeechSuccess (idx, piece)
+                            notifiedRef <! PieceReceived (idx, data)
                             state.RunningPieces |> Bitfield.setBit idx false
                         else
                             logDebug mailbox $"Leeched piece %d{idx} hash is invalid"
                             try
-                                piece.Release()
+                                data.Release()
                             with exn ->
                                 logError mailbox $"Failed to release piece %d{idx} %A{exn}"
-                            notifiedRef <! PieceLeechFailure (idx, Exception($"Expected hash did not match hash of received piece %d{idx}"))
                     else
                         // Piece is currently not running means that multiple peers were leeching and one already successfully completed.
-                        logDebug mailbox $"Leeched piece %d{idx} %A{piece} but we already have it"
+                        logDebug mailbox $"Leeched piece %d{idx} %A{data} but we already have it"
                 | BitfieldBytesReceived bytes ->
                     match state.PeerBitfields.TryGetValue(mailbox.Context.Sender.Path.Name) with
                     | true, bitfield ->
@@ -203,7 +192,7 @@ module Pieces =
             
             and handleRequest (state: State) request =
                 match request with
-                | Request.LeechPiece ->
+                | Request.PieceToLeech ->
                     match state.PeerBitfields.TryGetValue(mailbox.Context.Sender.Path.Name) with
                     | true, bitfield -> 
                         logDebug mailbox $"Requested for piece to leech by %s{mailbox.Context.Sender.Path.Name}"
@@ -221,7 +210,7 @@ module Pieces =
                         match state.PieceSelector |> pendingPieceSelector state.PendingPieces bitfield with
                         | Some idx ->
                             logDebug mailbox $"Found pending piece %d{idx} for %s{mailbox.Context.Sender.Path.Name}"
-                            mailbox.Context.Sender <! Response.LeechPiece (state.Pieces[idx].Index, state.Pieces[idx].Length)
+                            mailbox.Context.Sender <! Response.PieceToLeech (state.Pieces[idx].Index, state.Pieces[idx].Length)
                             state.PendingPieces |> Bitfield.setBit idx false
                             state.RunningPieces |> Bitfield.setBit idx true
                         | None ->
@@ -234,7 +223,7 @@ module Pieces =
                             match state.PieceSelector |> runningPieceSelector state.RunningPieces bitfield with
                             | Some idx ->
                                 logDebug mailbox $"Found running piece %d{idx} for %s{mailbox.Context.Sender.Path.Name}"
-                                mailbox.Context.Sender <! Response.LeechPiece (state.Pieces[idx].Index, state.Pieces[idx].Length)
+                                mailbox.Context.Sender <! Response.PieceToLeech (state.Pieces[idx].Index, state.Pieces[idx].Length)
                             | _ ->
                                 logDebug mailbox $"Found nothing for %s{mailbox.Context.Sender.Path.Name}"
                     | _ ->

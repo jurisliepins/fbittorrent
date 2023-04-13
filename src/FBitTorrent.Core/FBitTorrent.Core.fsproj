@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Application.fs" />
+    <Compile Include="Constants.fs" />
     <Compile Include="Buffer.fs" />
     <Compile Include="Network.fs" />
     <Compile Include="FileSystem.fs" />

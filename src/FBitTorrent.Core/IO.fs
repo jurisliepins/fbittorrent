@@ -38,11 +38,11 @@ module IO =
           Files           = files }
 
     type Command =
-        | WritePiece of int * ByteBuffer
+        | WritePiece of Id: int * Data: ByteBuffer
     
     type CommandResult =
-        | PieceWriteSuccess of int
-        | PieceWriteFailure of int * Exception
+        | PieceWriteSuccess of Id: int
+        | PieceWriteFailure of Id: int * Error: Exception
     
     let private createDirs (fs: IFileSystem) (rootDirPath: string) (dirPaths: string list) =
         if fs.DirectoryExists(rootDirPath) then
