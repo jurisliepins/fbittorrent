@@ -9,18 +9,28 @@ open Akka.Actor
 open FBitTorrent.Core
 
 module Peer =
-    module Reader =
-        type Command = Read
+    module Connection =
+        type private Action = Read
         
-        type ReadResult =
-            | Success of Message
-            | Failure of Exception
+        type Command =
+            | WriteMessage of Message: Message
         
-        let actorName () = "reader"
+        type CommandResult =
+            | WriteMessageFailure of Error: Exception
         
-        let actorFn (connection: IMessageConnection) ref (mailbox: Actor<obj>) =
+        type Notification =
+            | ReadMessage of Message: Message
+            | ReadFailure of Error: Exception
+        
+        let actorName () = "connection"
+        
+        let actorFn (connection: IMessageConnection) notifiedRef (mailbox: Actor<obj>) =
+            mailbox.Defer(connection.Dispose)
             let rec receive () = actor {
                 match! mailbox.Receive() with
+                | :? Action as action ->
+                    return! handleAction action
+                
                 | :? Command as command ->
                     return! handleCommand command
                     
@@ -28,47 +38,29 @@ module Peer =
                     mailbox.Unhandled(message)
                     return! receive () }
             
-            and handleCommand command =
-                match command with
+            and handleAction action = 
+                match action with
                 | Read -> 
                     Async.StartAsTask(async {
                        try
                            let! message = connection.AsyncReadMessage()
                            mailbox.Self <! Read
-                           return Success message
+                           return ReadMessage message
                        with exn ->
-                           return Failure (Exception("Failed to read from connection", exn)) }
-                    ).PipeTo(ref) |> ignore
+                           return ReadFailure (Exception("Failed to read from connection", exn)) }
+                    ).PipeTo(notifiedRef) |> ignore
                     receive ()
-            
-            receive ()
-    
-    module Writer =
-        type Command = Write of Message
-        
-        type WriteResult =
-            | Failure of Exception
-        
-        let actorName () = "writer"
-        
-        let actorFn (connection: IMessageConnection) ref (mailbox: Actor<obj>) =
-            let rec receive () = actor {
-                match! mailbox.Receive() with    
-                | :? Command as command ->
-                    return! handleCommand command
-                    
-                | message ->
-                    mailbox.Unhandled(message)
-                    return! receive () }
             
             and handleCommand command =
                 match command with
-                | Write message ->
+                | WriteMessage message ->
                     try
                         connection.WriteMessage(message)
                     with exn ->
-                        ref <! Failure (Exception("Failed to write to the connection", exn))
-                    receive ()
+                        mailbox.Context.Sender <! WriteMessageFailure (Exception("Failed to write message", exn))
+                receive ()
+            
+            mailbox.Self <! Read
             
             receive ()
 
@@ -105,7 +97,6 @@ module Peer =
         | NextLeech
     
     type private Action =
-        | Read
         | Leech of LeechType
         | KeepAlive
         | MeasureRate
@@ -132,9 +123,7 @@ module Peer =
     
     let actorFn notifiedRef piecesRef (connection: IMessageConnection) (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
-        mailbox.Defer(connection.Dispose)
-        let readerRef = spawn mailbox (Reader.actorName ()) (Reader.actorFn connection mailbox.Self)
-        let writerRef = spawn mailbox (Writer.actorName ()) (Writer.actorFn connection mailbox.Self)
+        let connectionRef = spawn mailbox (Connection.actorName ()) (Connection.actorFn connection mailbox.Self)
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action ->
@@ -146,27 +135,24 @@ module Peer =
             | :? Pieces.Response as response ->
                 return! handlePiecesResponse pipeline leechOpt downMeter upMeter state response
             
-            | :? Reader.ReadResult as result ->
-                return! handleReadResult pipeline leechOpt downMeter upMeter state result
+            | :? Connection.CommandResult as result ->
+                return! handleConnectionCommandResult pipeline leechOpt downMeter upMeter state result
             
-            | :? Writer.WriteResult as result ->
-                return! handleWriteResult pipeline leechOpt downMeter upMeter state result
+            | :? Connection.Notification as notification ->
+                return! handleConnectionNotification pipeline leechOpt downMeter upMeter state notification
                         
             | message ->
                 return! unhandled pipeline leechOpt downMeter upMeter state message }
         
         and handleAction pipeline leechOpt downMeter upMeter (state: State) action =
             match action with
-            | Read ->
-                readerRef <! Reader.Read
-                receive pipeline leechOpt downMeter upMeter state
             | Leech leechType ->
                 match leechType with
                 | FirstLeech ->
                     if not (Bitfield.isEmpty state.SelfBitfield) then
-                        writerRef <! Writer.Write (BitfieldMessage (state.SelfBitfield.ToArray()))
+                        connectionRef <! Connection.WriteMessage (BitfieldMessage (state.SelfBitfield.ToArray()))
                     if not (Bitfield.isFull state.SelfBitfield) then
-                        writerRef <! Writer.Write InterestedMessage
+                        connectionRef <! Connection.WriteMessage InterestedMessage
                         let nextState = { state with SelfInterested = true }
                         notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
                         receive pipeline leechOpt downMeter upMeter nextState
@@ -177,18 +163,18 @@ module Peer =
                     | Some (idx, requests, responses), { PeerChoking = false } ->
                         match BlockRequests.pop requests with 
                         | Some block when not (BlockPipeline.isBacklogFilled requests responses pipeline)->
-                            writerRef <! Writer.Write (RequestMessage (idx, block.Beginning, block.Length))
+                            connectionRef <! Connection.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
                             mailbox.Self <! Leech NextLeech
                             receive pipeline leechOpt downMeter upMeter state
                         | Some block ->
-                            writerRef <! Writer.Write (RequestMessage (idx, block.Beginning, block.Length))
+                            connectionRef <! Connection.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
                             receive pipeline leechOpt downMeter upMeter state
                         | None ->
                             receive pipeline leechOpt downMeter upMeter state
                     | _ ->
                         receive pipeline leechOpt downMeter upMeter state
             | KeepAlive ->
-                writerRef <! Writer.Write KeepAliveMessage
+                connectionRef <! Connection.WriteMessage KeepAliveMessage
                 mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(KeepAliveIntervalSec), mailbox.Self, KeepAlive)
                 receive pipeline leechOpt downMeter upMeter state
             | MeasureRate ->
@@ -210,13 +196,13 @@ module Peer =
                     for request in requests do
                         match request with
                         | BlockRequest.Requested { Beginning = beg; Length = length } ->
-                            writerRef <! Writer.Write (CancelMessage (idx, beg, length))
+                            connectionRef <! Connection.WriteMessage (CancelMessage (idx, beg, length))
                         | _ -> ()
-                    writerRef <! Writer.Write (HaveMessage idx)
+                    connectionRef <! Connection.WriteMessage (HaveMessage idx)
                     state.SelfBitfield |> Bitfield.setBit idx true
                     receive pipeline None downMeter upMeter state
                 | _ ->
-                    writerRef <! Writer.Write (HaveMessage idx)
+                    connectionRef <! Connection.WriteMessage (HaveMessage idx)
                     state.SelfBitfield |> Bitfield.setBit idx true
                     receive pipeline leechOpt downMeter upMeter state
         
@@ -230,9 +216,15 @@ module Peer =
                     mailbox.Self <! Leech NextLeech
                     receive pipeline (Some (idx, BlockRequests.create length, BlockResponses.create length)) downMeter upMeter state
 
-        and handleReadResult pipeline leechOpt downMeter upMeter (state: State) result =
+        and handleConnectionCommandResult pipeline leechOpt downMeter upMeter (state: State) result =
             match result with
-            | Reader.Success message ->
+            | Connection.WriteMessageFailure error ->
+                notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
+            receive pipeline leechOpt downMeter upMeter state
+        
+        and handleConnectionNotification pipeline leechOpt downMeter upMeter (state: State) notification =
+            match notification with
+            | Connection.ReadMessage message ->
                 match message with
                 | KeepAliveMessage ->
                     receive pipeline leechOpt downMeter upMeter state
@@ -309,20 +301,14 @@ module Peer =
                     mailbox.Unhandled(message)
                     receive pipeline leechOpt downMeter upMeter state
                     
-            | Reader.Failure error ->
+            | Connection.ReadFailure error ->
                 notifiedRef <! Notification.Failed (Exception("Peer failed to read", error))
                 receive pipeline leechOpt downMeter upMeter state
-            
-        and handleWriteResult pipeline leechOpt downMeter upMeter (state: State) result =
-            match result with
-            | Writer.Failure error -> notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
-            receive pipeline leechOpt downMeter upMeter state
         
         and unhandled pipeline leechOpt downMeter upMeter (state: State) message =
             mailbox.Unhandled(message)
             receive pipeline leechOpt downMeter upMeter state
         
-        mailbox.Self <! Read
         mailbox.Self <! Leech FirstLeech
         mailbox.Self <! KeepAlive
         mailbox.Self <! MeasureRate
