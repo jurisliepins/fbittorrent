@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Net
 open System.Linq
+open System.Text
 open Akka.FSharp
 open Akka.Actor
 open FBitTorrent.Core
@@ -13,24 +14,26 @@ module Peer =
     module Connection =
         
         type State =
-            { SelfHandshake: Handshake
-              PeerHandshake: Handshake option }
+            { Placeholder: unit }
         
-        let createState (selfHandshake: Handshake) =
-            { SelfHandshake = selfHandshake
-              PeerHandshake = None }
+        let createState () =
+            { Placeholder = () }
         
-        type private Action = Read
+        type private Action =
+            | ReadHandshake
+            | ReadMessage
         
         type Command =
-            | WriteMessage of Message: Message
+            | WriteHandshake of Handshake: Handshake
+            | WriteMessage   of Message: Message
         
         type CommandResult =
             | WriteFailure of Error: Exception
         
         type Notification =
-            | ReadMessage of Message: Message
-            | ReadFailure of Error: Exception
+            | ReceivedHandshake of Handshake: Handshake
+            | ReceivedMessage   of Message: Message
+            | ReceivingFailed   of Error: Exception
         
         let actorName () = "connection"
         
@@ -49,19 +52,33 @@ module Peer =
             
             and handleAction (state: State) action = 
                 match action with
-                | Read -> 
+                | ReadHandshake -> 
                     Async.StartAsTask(async {
-                       try
-                           let! message = Message.asyncRead connection.Reader
-                           mailbox.Self <! Read
-                           return ReadMessage message
-                       with exn ->
-                           return ReadFailure (Exception("Failed to read message", exn)) }
-                    ).PipeTo(notifiedRef) |> ignore
-                    receive state
+                        try
+                            let! handshake = Handshake.asyncRead connection.Reader
+                            mailbox.Self <! ReadMessage
+                            return ReceivedHandshake handshake
+                        with exn ->
+                            return ReceivingFailed (Exception("Failed to read handshake", exn))
+                    }).PipeTo(notifiedRef) |> ignore
+                | ReadMessage -> 
+                    Async.StartAsTask(async {
+                        try
+                            let! message = Message.asyncRead connection.Reader
+                            mailbox.Self <! ReadMessage
+                            return ReceivedMessage message
+                        with exn ->
+                            return ReceivingFailed (Exception("Failed to read message", exn))
+                    }).PipeTo(notifiedRef) |> ignore
+                receive state
             
             and handleCommand (state: State) command =
                 match command with
+                | WriteHandshake handshake ->
+                    try
+                        Handshake.write connection.Writer handshake
+                    with exn ->
+                        mailbox.Context.Sender <! WriteFailure (Exception("Failed to write handshake", exn))
                 | WriteMessage message ->
                     try
                         Message.write connection.Writer message
@@ -73,7 +90,7 @@ module Peer =
                 mailbox.Unhandled(message)
                 receive state 
             
-            mailbox.Self <! Read
+            mailbox.Self <! ReadHandshake
             
             receive initialState
             
@@ -88,9 +105,11 @@ module Peer =
     let [<Literal>] MeasureRateIntervalSec = 1.0
     
     type State =
-        { SelfBitfield:   Bitfield
+        { SelfHandshake:  Handshake
+          SelfBitfield:   Bitfield
           SelfChoking:    bool
           SelfInterested: bool
+          PeerHandshake:  Handshake option
           PeerBitfield:   Bitfield
           PeerChoking:    bool
           PeerInterested: bool
@@ -99,11 +118,13 @@ module Peer =
           DownRate:       Rate
           UpRate:         Rate }
 
-    let createState (selfBitfield: Bitfield) (peerBitfield: Bitfield) =
-        { SelfBitfield   = selfBitfield
+    let createState (selfHandshake: Handshake) (selfBitfield: Bitfield) =
+        { SelfHandshake  = selfHandshake
+          SelfBitfield   = selfBitfield
           SelfChoking    = true
           SelfInterested = false
-          PeerBitfield   = peerBitfield
+          PeerHandshake  = None  
+          PeerBitfield   = Bitfield.create selfBitfield.Capacity
           PeerChoking    = true
           PeerInterested = false
           Downloaded     = 0L
@@ -119,6 +140,9 @@ module Peer =
         | Leech of LeechType
         | KeepAlive
         | MeasureRate
+    
+    type Command =
+        | InitiateHandshake
     
     type Message =
         | PieceLeeched of Id: int
@@ -140,13 +164,16 @@ module Peer =
     
     let actorName (address: IPAddress) (port: int) = $"peer-%A{address}:%d{port}"
     
-    let actorFn connectionFn notifiedRef piecesRef (connection: IConnection) (selfHandshake: Handshake) (initialState: State) (mailbox: Actor<obj>) =
+    let actorFn connectionFn notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
-        let connectionRef = spawn mailbox (Connection.actorName ()) (connectionFn connection mailbox.Self (Connection.createState selfHandshake))
+        let connectionRef = spawn mailbox (Connection.actorName ()) (connectionFn connection mailbox.Self (Connection.createState ()))
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action ->
                 return! handleAction pipeline leechOpt downMeter upMeter state action
+            
+            | :? Command as command ->
+                return! handleCommand pipeline leechOpt downMeter upMeter state command
             
             | :? Message as message ->
                 return! handleMessage pipeline leechOpt downMeter upMeter state message
@@ -207,6 +234,12 @@ module Peer =
                 mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(MeasureRateIntervalSec), mailbox.Self, MeasureRate)
                 receive pipeline leechOpt downMeter upMeter nextState
         
+        and handleCommand pipeline leechOpt downMeter upMeter (state: State) command =
+            match command with
+            | InitiateHandshake ->
+                connectionRef <! Connection.WriteHandshake state.SelfHandshake
+                receive pipeline leechOpt downMeter upMeter state
+        
         and handleMessage pipeline leechOpt downMeter upMeter (state: State) message =
             match message with
             | PieceLeeched idx ->
@@ -243,7 +276,23 @@ module Peer =
         
         and handleConnectionNotification pipeline leechOpt downMeter upMeter (state: State) notification =
             match notification with
-            | Connection.ReadMessage message ->
+            | Connection.ReceivedHandshake peerHandshake ->
+                let isProtocolValid (selfProtocol: byte[]) (peerProtocol: byte[]) = Enumerable.SequenceEqual(selfProtocol, peerProtocol)
+                let isInfoHashValid (selfInfoHash: byte[]) (peerInfoHash: byte[]) = Enumerable.SequenceEqual(selfInfoHash, peerInfoHash)
+                match (state.SelfHandshake, peerHandshake) with
+                | Handshake (selfProtocol, _, _, _), Handshake (peerProtocol, _, _, _) when not (isProtocolValid selfProtocol peerProtocol)  ->
+                    notifiedRef <! Notification.Failed (Exception($"Failed to handshake invalid protocol (expected: %s{Encoding.ASCII.GetString(selfProtocol)}, received: %s{Encoding.ASCII.GetString(peerProtocol)})"))
+                    receive pipeline leechOpt downMeter upMeter state
+                | Handshake (_, _, selfInfoHash, _), Handshake (_, _, peerInfoHash, _) when not (isInfoHashValid selfInfoHash peerInfoHash)  ->
+                    notifiedRef <! Notification.Failed (Exception($"Failed to handshake invalid info-hash (expected: %s{Encoding.ASCII.GetString(selfInfoHash)}, received: %s{Encoding.ASCII.GetString(peerInfoHash)})"))
+                    receive pipeline leechOpt downMeter upMeter state
+                | _ ->
+                    mailbox.Self <! Leech FirstLeech
+                    mailbox.Self <! KeepAlive
+                    mailbox.Self <! MeasureRate
+                    receive pipeline leechOpt downMeter upMeter { state with PeerHandshake = Some peerHandshake }
+                
+            | Connection.ReceivedMessage message ->
                 match message with
                 | KeepAliveMessage ->
                     receive pipeline leechOpt downMeter upMeter state
@@ -320,17 +369,13 @@ module Peer =
                     mailbox.Unhandled(message)
                     receive pipeline leechOpt downMeter upMeter state
                     
-            | Connection.ReadFailure error ->
+            | Connection.ReceivingFailed error ->
                 notifiedRef <! Notification.Failed (Exception("Peer failed to read", error))
                 receive pipeline leechOpt downMeter upMeter state
         
         and unhandled pipeline leechOpt downMeter upMeter (state: State) message =
             mailbox.Unhandled(message)
             receive pipeline leechOpt downMeter upMeter state
-        
-        mailbox.Self <! Leech FirstLeech
-        mailbox.Self <! KeepAlive
-        mailbox.Self <! MeasureRate
         
         receive (BlockPipeline.create ()) None (RateMeter.create ()) (RateMeter.create ()) initialState
             
