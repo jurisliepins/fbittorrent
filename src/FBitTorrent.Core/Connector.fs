@@ -44,7 +44,8 @@ module Connector =
         
         receive ()
         
-    let defaultActorBody mailbox = actorBody Connection.asyncTcpConnect mailbox
+    let defaultActorBody mailbox =
+        actorBody Connection.asyncTcpConnect mailbox
     
     let spawn (actorFactory: IActorRefFactory) =
         spawn actorFactory (actorName ()) defaultActorBody 

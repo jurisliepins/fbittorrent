@@ -93,7 +93,8 @@ module Announcer =
         
         receive ()
 
-    let defaultActorBody mailbox = actorBody Tracker.httpQuery mailbox
+    let defaultActorBody mailbox =
+        actorBody Tracker.httpQuery mailbox
     
     let spawn (actorFactory: IActorRefFactory) =
         spawn actorFactory (actorName ()) defaultActorBody

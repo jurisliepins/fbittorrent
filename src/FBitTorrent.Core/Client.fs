@@ -212,7 +212,7 @@ module Client =
         
         receive initialState
         
-    let defaultActorBody initialState (mailbox: Actor<obj>) =
+    let defaultActorBody initialState mailbox =
         actorBody initialState mailbox
         
     let spawn (actorFactory: IActorRefFactory) (initialState: State) =

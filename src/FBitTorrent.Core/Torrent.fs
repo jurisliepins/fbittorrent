@@ -314,7 +314,7 @@ module Torrent =
 
         receive (RateMeter.createFromBytes initialState.Downloaded) (RateMeter.createFromBytes initialState.Uploaded) initialState
     
-    let defaultActorBody notifiedRef initialState (mailbox: Actor<obj>) =
+    let defaultActorBody notifiedRef initialState mailbox =
         actorBody notifiedRef initialState mailbox
         
     let spawn (actorFactory: IActorRefFactory) notifiedRef (initialState: State) =
