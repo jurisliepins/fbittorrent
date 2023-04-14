@@ -40,7 +40,7 @@ module Handshake =
     let defaultCreate (ih: byte[]) (pid: byte[]) =
         create protocolBytes reservedBytes ih pid
     
-    let write (writer: ConnectionWriter) (Handshake (proto, res, ih, pid): Handshake) =
+    let write (writer: BigEndianWriter) (Handshake (proto, res, ih, pid): Handshake) =
         writer.Write(proto.Length |> byte)
         writer.Write(proto)
         writer.Write(res)
@@ -48,7 +48,7 @@ module Handshake =
         writer.Write(pid)
         writer.Flush()
         
-    let asyncWrite (writer: ConnectionWriter) (Handshake (proto, res, ih, pid): Handshake) = async {
+    let asyncWrite (writer: BigEndianWriter) (Handshake (proto, res, ih, pid): Handshake) = async {
         do! writer.AsyncWrite(proto.Length |> byte)
         do! writer.AsyncWrite(proto)
         do! writer.AsyncWrite(res)
@@ -56,7 +56,7 @@ module Handshake =
         do! writer.AsyncWrite(pid)
         do! writer.AsyncFlush() }
     
-    let read (reader: ConnectionReader) =
+    let read (reader: BigEndianReader) =
         let len = reader.ReadByte()
         let proto = reader.ReadBytes(int len)
         let res = reader.ReadBytes(8)
@@ -64,7 +64,7 @@ module Handshake =
         let pid = reader.ReadBytes(20)
         Handshake (proto, res, ih, pid)
     
-    let asyncRead (reader: ConnectionReader) = async {
+    let asyncRead (reader: BigEndianReader) = async {
         let! len = reader.AsyncReadByte()
         let! proto = reader.AsyncReadBytes(int len)
         let! res = reader.AsyncReadBytes(8)
@@ -74,7 +74,7 @@ module Handshake =
         
     let toBytes handshake =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         write writer handshake
         stream.ToArray()
         
@@ -83,7 +83,7 @@ module Handshake =
         
     let fromBytes (bytes: byte[]) =
         use stream = new MemoryStream(bytes)
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         read reader
         
     let fromString (string: string) =

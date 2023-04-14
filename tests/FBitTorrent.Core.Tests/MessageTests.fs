@@ -44,7 +44,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write keep-alive message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer Message.KeepAliveMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 0uy; |])
@@ -52,7 +52,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write keep-alive message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer Message.KeepAliveMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 0uy; |]) }
@@ -60,7 +60,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read keep-alive message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 0uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | KeepAliveMessage -> ()
         | _ -> 
@@ -69,7 +69,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read keep-alive message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 0uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | KeepAliveMessage -> ()
         | _ -> 
@@ -78,7 +78,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write choke message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer Message.ChokeMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 0uy; |])
@@ -86,7 +86,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write choke message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer Message.ChokeMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 0uy; |]) }
@@ -94,7 +94,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read choke message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 0uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | ChokeMessage -> ()
         | _ -> 
@@ -103,7 +103,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read choke message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 0uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | ChokeMessage -> ()
         | _ -> 
@@ -112,7 +112,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write un-choke message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer Message.UnChokeMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 1uy; |])
@@ -120,7 +120,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write un-choke message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer Message.UnChokeMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 1uy; |]) }
@@ -128,7 +128,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read un-choke message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 1uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | UnChokeMessage -> ()
         | _ -> 
@@ -137,7 +137,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read un-choke message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 1uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | UnChokeMessage -> ()
         | _ -> 
@@ -146,7 +146,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write interested message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer Message.InterestedMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 2uy; |])
@@ -154,7 +154,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write interested message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer Message.InterestedMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 2uy; |]) }
@@ -162,7 +162,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read interested message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 2uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | InterestedMessage -> ()
         | _ -> 
@@ -171,7 +171,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read interested message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 2uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | InterestedMessage -> ()
         | _ -> 
@@ -180,7 +180,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write not interested message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer Message.NotInterestedMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 3uy; |])
@@ -188,7 +188,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write not interested message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer Message.NotInterestedMessage
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 1uy; 3uy; |]) }
@@ -196,7 +196,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read not interested message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 3uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | NotInterestedMessage -> ()
         | _ -> 
@@ -205,7 +205,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read not interested message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 1uy; 3uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | NotInterestedMessage -> ()
         | _ -> 
@@ -214,7 +214,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write have message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer (Message.HaveMessage(100))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 5uy; 4uy; 0uy; 0uy; 0uy; 100uy |])
@@ -222,7 +222,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write have message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer (Message.HaveMessage(100))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 5uy; 4uy; 0uy; 0uy; 0uy; 100uy |]) }
@@ -230,7 +230,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read have message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 5uy; 4uy; 0uy; 0uy; 0uy; 100uy |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | HaveMessage(100) -> ()
         | _ -> 
@@ -239,7 +239,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read have message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 5uy; 4uy; 0uy; 0uy; 0uy; 100uy |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | HaveMessage(100) -> ()
         | _ -> 
@@ -248,7 +248,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write bitfield message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer (Message.BitfieldMessage([| 0uy; 1uy; 2uy; 3uy |]))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 5uy; 5uy; 0uy; 1uy; 2uy; 3uy; |])
@@ -256,7 +256,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write bitfield message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer (Message.BitfieldMessage([| 0uy; 1uy; 2uy; 3uy |]))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 5uy; 5uy; 0uy; 1uy; 2uy; 3uy; |]) }
@@ -264,7 +264,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read bitfield message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 5uy; 5uy; 0uy; 1uy; 2uy; 3uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | Message.BitfieldMessage([| 0uy; 1uy; 2uy; 3uy |]) -> ()
         | _ -> 
@@ -273,7 +273,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read bitfield message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 5uy; 5uy; 0uy; 1uy; 2uy; 3uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | Message.BitfieldMessage([| 0uy; 1uy; 2uy; 3uy |]) -> ()
         | _ -> 
@@ -282,7 +282,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write request message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer (Message.RequestMessage(1, 2, 3))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 13uy; 6uy; 0uy; 0uy; 0uy
@@ -291,7 +291,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write request message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer (Message.RequestMessage(1, 2, 3))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 13uy; 6uy; 0uy; 0uy; 0uy
@@ -301,7 +301,7 @@ module MessageTests =
     let ``Test should read request message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 13uy; 6uy; 0uy; 0uy; 0uy
                                          1uy; 0uy; 0uy; 0uy; 2uy; 0uy; 0uy; 0uy; 3uy |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | Message.RequestMessage(1, 2, 3) -> ()
         | _ -> 
@@ -311,7 +311,7 @@ module MessageTests =
     let ``Test should async read request message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 13uy; 6uy; 0uy; 0uy; 0uy
                                          1uy; 0uy; 0uy; 0uy; 2uy; 0uy; 0uy; 0uy; 3uy |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | Message.RequestMessage(1, 2, 3) -> ()
         | _ -> 
@@ -320,7 +320,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write piece message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer (Message.PieceMessage(1, 2, ByteBuffer([| 100uy; 100uy |])))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 11uy; 7uy; 0uy; 0uy; 0uy; 1uy; 0uy; 0uy; 0uy; 2uy; 100uy; 100uy; |])
@@ -328,7 +328,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write piece message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer (Message.PieceMessage(1, 2, ByteBuffer([| 100uy; 100uy |])))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 11uy; 7uy; 0uy; 0uy; 0uy; 1uy; 0uy; 0uy; 0uy; 2uy; 100uy; 100uy; |]) }
@@ -336,7 +336,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read piece message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 11uy; 7uy; 0uy; 0uy; 0uy; 1uy; 0uy; 0uy; 0uy; 2uy; 100uy; 100uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | Message.PieceMessage(1, 2, piece) when ByteBuffer([| 100uy; 100uy |]).Equals(piece) -> ()
         | _ -> 
@@ -345,7 +345,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read piece message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 11uy; 7uy; 0uy; 0uy; 0uy; 1uy; 0uy; 0uy; 0uy; 2uy; 100uy; 100uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | Message.PieceMessage(1, 2, piece) when ByteBuffer([| 100uy; 100uy |]).Equals(piece) -> ()
         | _ -> 
@@ -354,7 +354,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write cancel message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer (Message.CancelMessage(1, 2, 3))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 13uy; 8uy; 0uy; 0uy; 0uy
@@ -363,7 +363,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write cancel message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer (Message.CancelMessage(1, 2, 3))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 13uy; 8uy; 0uy; 0uy; 0uy
@@ -373,7 +373,7 @@ module MessageTests =
     let ``Test should read cancel message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 13uy; 8uy; 0uy; 0uy; 0uy
                                          1uy; 0uy; 0uy; 0uy; 2uy; 0uy; 0uy; 0uy; 3uy |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | Message.CancelMessage(1, 2, 3) -> ()
         | _ -> 
@@ -383,7 +383,7 @@ module MessageTests =
     let ``Test should async read cancel message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 13uy; 8uy; 0uy; 0uy; 0uy
                                          1uy; 0uy; 0uy; 0uy; 2uy; 0uy; 0uy; 0uy; 3uy |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | Message.CancelMessage(1, 2, 3) -> ()
         | _ -> 
@@ -392,7 +392,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should write port message`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Message.write writer (Message.PortMessage(3500s))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 3uy; 9uy; 13uy; 172uy; |])
@@ -400,7 +400,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async write port message`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Message.asyncWrite writer (Message.PortMessage(3500s))
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>(bytes, [| 0uy; 0uy; 0uy; 3uy; 9uy; 13uy; 172uy; |]) }
@@ -408,7 +408,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should read port message`` () =
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 3uy; 9uy; 13uy; 172uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match Message.read reader with
         | Message.PortMessage(3500s) -> ()
         | _ -> 
@@ -417,7 +417,7 @@ module MessageTests =
     [<Fact>]
     let ``Test should async read port message`` () = async {
         use stream = new MemoryStream([| 0uy; 0uy; 0uy; 3uy; 9uy; 13uy; 172uy; |])
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         match! Message.asyncRead reader with
         | Message.PortMessage(3500s) -> ()
         | _ -> 

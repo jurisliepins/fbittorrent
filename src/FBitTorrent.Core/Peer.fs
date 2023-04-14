@@ -10,9 +10,7 @@ open Akka.Actor
 open FBitTorrent.Core
 
 module Peer =
-    
     module Stream =
-        
         type State =
             { Placeholder: unit }
         
@@ -99,6 +97,10 @@ module Peer =
             
         let spawn (actorFactory: IActorRefFactory) notifiedRef connection (initialState: State) =
             spawn actorFactory (actorName ()) (defaultActorBody notifiedRef connection initialState)
+    
+    module StreamExtensions =
+        type IActorContext with
+            member __.GetStream() : IActorRef = __.Child(Stream.actorName ())
     
     let [<Literal>] KeepAliveIntervalSec = 30.0
     

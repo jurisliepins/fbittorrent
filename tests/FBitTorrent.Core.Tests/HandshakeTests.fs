@@ -35,7 +35,7 @@ module HandshakeTests =
     let ``Test should write handshake`` () =
         let handshake = Handshake.defaultCreate infoHashBytes peerIdBytes
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         Handshake.write writer handshake
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>([| Handshake.protocolBytes.Length |> byte |], bytes.[0..0])
@@ -48,7 +48,7 @@ module HandshakeTests =
     let ``Test should async write handshake`` () = async {
         let handshake = Handshake.defaultCreate infoHashBytes peerIdBytes
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         do! Handshake.asyncWrite writer handshake
         let bytes = stream.ToArray()
         Assert.Equal<byte[]>([| Handshake.protocolBytes.Length |> byte |], bytes.[0..0])
@@ -60,7 +60,7 @@ module HandshakeTests =
     [<Fact>]
     let ``Test should read handshake`` () =
         use stream = new MemoryStream(handshakeBytes)
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         let (Handshake (proto, res, ih, pid)) = Handshake.read reader
         Assert.Equal<byte[]>(Handshake.protocolBytes, proto)
         Assert.Equal<byte[]>(Handshake.reservedBytes, res)
@@ -70,7 +70,7 @@ module HandshakeTests =
     [<Fact>]
     let ``Test should async read handshake`` () = async {
         use stream = new MemoryStream(handshakeBytes)
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         let! (Handshake (proto, res, ih, pid)) = Handshake.asyncRead reader
         Assert.Equal<byte[]>(Handshake.protocolBytes, proto)
         Assert.Equal<byte[]>(Handshake.reservedBytes, res)
@@ -80,8 +80,8 @@ module HandshakeTests =
     [<Fact>]
     let ``Test should write/read handshake`` () =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
-        use reader = new ConnectionReader(stream)
+        use writer = new BigEndianWriter(stream)
+        use reader = new BigEndianReader(stream)
         Handshake.write writer (Handshake.defaultCreate infoHashBytes peerIdBytes)
         stream.Position <- 0
         let (Handshake (proto, res, ih, pid)) = Handshake.read reader
@@ -93,8 +93,8 @@ module HandshakeTests =
     [<Fact>]
     let ``Test should async write/read handshake`` () = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
-        use reader = new ConnectionReader(stream)
+        use writer = new BigEndianWriter(stream)
+        use reader = new BigEndianReader(stream)
         do! Handshake.asyncWrite writer (Handshake.defaultCreate infoHashBytes peerIdBytes)
         stream.Position <- 0
         let! (Handshake (proto, res, ih, pid)) = Handshake.asyncRead reader
@@ -107,8 +107,8 @@ module HandshakeTests =
     let ``Test should read/write handshake`` () =
         use rstream = new MemoryStream(handshakeBytes)
         use wstream = new MemoryStream()
-        use reader = new ConnectionReader(rstream)
-        use writer = new ConnectionWriter(wstream)
+        use reader = new BigEndianReader(rstream)
+        use writer = new BigEndianWriter(wstream)
         Handshake.write writer (Handshake.read reader)
         Assert.Equal<byte[]>(rstream.ToArray(), wstream.ToArray())
         
@@ -116,8 +116,8 @@ module HandshakeTests =
     let ``Test should async read/write handshake`` () = async {
         use rstream = new MemoryStream(handshakeBytes)
         use wstream = new MemoryStream()
-        use reader = new ConnectionReader(rstream)
-        use writer = new ConnectionWriter(wstream)
+        use reader = new BigEndianReader(rstream)
+        use writer = new BigEndianWriter(wstream)
         let! handshake = Handshake.asyncRead reader
         do! Handshake.asyncWrite writer handshake
         Assert.Equal<byte[]>(rstream.ToArray(), wstream.ToArray()) }

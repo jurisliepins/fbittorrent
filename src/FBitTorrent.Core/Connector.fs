@@ -34,8 +34,8 @@ module Connector =
                         let! connection = asyncConnect endpoint
                         return ConnectSuccess connection    
                     with exn ->
-                        return ConnectFailure (endpoint, Exception($"Failed to connect to %A{endpoint.Address}:%d{endpoint.Port}", exn)) }
-                ).PipeTo(mailbox.Context.Sender) |> ignore
+                        return ConnectFailure (endpoint, Exception($"Failed to connect to %A{endpoint.Address}:%d{endpoint.Port}", exn))
+                }).PipeTo(mailbox.Context.Sender) |> ignore
                 receive ()
        
         and unhandled message =

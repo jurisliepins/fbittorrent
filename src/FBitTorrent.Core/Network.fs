@@ -35,7 +35,7 @@ module BigEndianConverter =
     
     let fromUInt64 (value: uint64) = BitConverter.GetBytes(value) |> convert
 
-type ConnectionReader(stream: Stream) =
+type BigEndianReader(stream: Stream) =
     interface IDisposable with
         member _.Dispose() = stream.Dispose()
     
@@ -138,7 +138,7 @@ type ConnectionReader(stream: Stream) =
         let! bytes = __.AsyncReadBytes(sizeof<uint64>)
         return BigEndianConverter.toUInt64 bytes }
 
-type ConnectionWriter(stream: Stream) =
+type BigEndianWriter(stream: Stream) =
     interface IDisposable with
         member _.Dispose() = stream.Dispose()
     
@@ -203,8 +203,8 @@ type ConnectionWriter(stream: Stream) =
 type IConnection =
     inherit IDisposable
     abstract member Stream: Stream with get
-    abstract member Writer: ConnectionWriter with get
-    abstract member Reader: ConnectionReader with get
+    abstract member Writer: BigEndianWriter with get
+    abstract member Reader: BigEndianReader with get
     abstract member RemoteEndpoint: IPEndPoint with get
     abstract member LocalEndpoint: IPEndPoint with get
     abstract member Disconnect: unit -> unit
@@ -218,8 +218,8 @@ module Connection =
             
     let createTcpConnection (client: TcpClient) =
         let stream = client.GetStream()
-        let writer = new ConnectionWriter(stream)
-        let reader = new ConnectionReader(stream)
+        let writer = new BigEndianWriter(stream)
+        let reader = new BigEndianReader(stream)
         { new IConnection with
             member _.Stream with get() = stream
             member _.Writer with get() = writer

@@ -9,19 +9,19 @@ open System.Text
 
 module ConnectionStreamTests =
 
-    let shouldWriteRead (write: ConnectionWriter -> 'a -> unit) (read: ConnectionReader -> 'a) (expectedValue: 'a) =
+    let shouldWriteRead (write: BigEndianWriter -> 'a -> unit) (read: BigEndianReader -> 'a) (expectedValue: 'a) =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
-        use reader = new ConnectionReader(stream)
+        use writer = new BigEndianWriter(stream)
+        use reader = new BigEndianReader(stream)
         write writer expectedValue
         stream.Position <- 0
         let actualValue = read reader
         Assert.Equal<'a>(actualValue, expectedValue)
 
-    let shouldAsyncWriteRead (asyncWrite: ConnectionWriter -> 'a -> Async<unit>) (read: ConnectionReader -> Async<'a>) (expectedValue: 'a) = async {
+    let shouldAsyncWriteRead (asyncWrite: BigEndianWriter -> 'a -> Async<unit>) (read: BigEndianReader -> Async<'a>) (expectedValue: 'a) = async {
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
-        use reader = new ConnectionReader(stream)
+        use writer = new BigEndianWriter(stream)
+        use reader = new BigEndianReader(stream)
         do! asyncWrite writer expectedValue
         stream.Position <- 0
         let! actualValue = read reader
@@ -30,37 +30,37 @@ module ConnectionStreamTests =
     [<Fact>]
     let ``Test should write/read Byte[]`` () =
         let buffer = [| 0uy; 1uy; 2uy; 3uy; 4uy; 5uy; 6uy; 7uy; |]
-        let w (writer: ConnectionWriter) (value: Byte[]) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadBytes(8)
+        let w (writer: BigEndianWriter) (value: Byte[]) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadBytes(8)
         shouldWriteRead w r buffer
         
     [<Fact>]
     let ``Test should async write/read Byte[]`` () = async{
         let buffer = [| 0uy; 1uy; 2uy; 3uy; 4uy; 5uy; 6uy; 7uy; |]
-        let w (writer: ConnectionWriter) (value: Byte[]) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadBytes(8)
+        let w (writer: BigEndianWriter) (value: Byte[]) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadBytes(8)
         do! shouldAsyncWriteRead w r buffer }
     
     [<Fact>]
     let ``Test should write/read ByteBuffer`` () =
         let buffer = ByteBuffer([| 0uy; 1uy; 2uy; 3uy; 4uy; 5uy; 6uy; 7uy; |])
-        let w (writer: ConnectionWriter) (value: ByteBuffer) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadByteBuffer(8)
+        let w (writer: BigEndianWriter) (value: ByteBuffer) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadByteBuffer(8)
         shouldWriteRead w r buffer
         
     [<Fact>]
     let ``Test should async write/read ByteBuffer`` () = async{
         let buffer = ByteBuffer([| 0uy; 1uy; 2uy; 3uy; 4uy; 5uy; 6uy; 7uy; |])
-        let w (writer: ConnectionWriter) (value: ByteBuffer) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadByteBuffer(8)
+        let w (writer: BigEndianWriter) (value: ByteBuffer) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadByteBuffer(8)
         do! shouldAsyncWriteRead w r buffer }
     
     [<Fact>]
     let ``Test should write/read Byte`` () =
         let min = Byte.MinValue
         let max = Byte.MaxValue
-        let w (writer: ConnectionWriter) (value: Byte) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadByte()
+        let w (writer: BigEndianWriter) (value: Byte) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadByte()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -68,8 +68,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read Byte`` () = async {
         let min = Byte.MinValue
         let max = Byte.MaxValue
-        let w (writer: ConnectionWriter) (value: Byte) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadByte()
+        let w (writer: BigEndianWriter) (value: Byte) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadByte()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
 
@@ -77,8 +77,8 @@ module ConnectionStreamTests =
     let ``Test should write/read big-endian Int16`` () =
         let min = Int16.MinValue
         let max = Int16.MaxValue
-        let w (writer: ConnectionWriter) (value: Int16) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadInt16()
+        let w (writer: BigEndianWriter) (value: Int16) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadInt16()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -86,8 +86,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read big-endian Int16`` () = async {
         let min = Int16.MinValue
         let max = Int16.MaxValue
-        let w (writer: ConnectionWriter) (value: Int16) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadInt16()
+        let w (writer: BigEndianWriter) (value: Int16) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadInt16()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
 
@@ -95,8 +95,8 @@ module ConnectionStreamTests =
     let ``Test should write/read big-endian UInt16`` () =
         let min = UInt16.MinValue
         let max = UInt16.MaxValue
-        let w (writer: ConnectionWriter) (value: UInt16) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadUInt16()
+        let w (writer: BigEndianWriter) (value: UInt16) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadUInt16()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -104,8 +104,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read big-endian UInt16`` () = async {
         let min = UInt16.MinValue
         let max = UInt16.MaxValue
-        let w (writer: ConnectionWriter) (value: UInt16) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadUInt16()
+        let w (writer: BigEndianWriter) (value: UInt16) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadUInt16()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
 
@@ -113,8 +113,8 @@ module ConnectionStreamTests =
     let ``Test should write/read big-endian Int32`` () =
         let min = Int32.MinValue
         let max = Int32.MaxValue
-        let w (writer: ConnectionWriter) (value: Int32) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadInt32()
+        let w (writer: BigEndianWriter) (value: Int32) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadInt32()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -122,8 +122,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read big-endian Int32`` () = async {
         let min = Int32.MinValue
         let max = Int32.MaxValue
-        let w (writer: ConnectionWriter) (value: Int32) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadInt32()
+        let w (writer: BigEndianWriter) (value: Int32) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadInt32()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
 
@@ -131,8 +131,8 @@ module ConnectionStreamTests =
     let ``Test should write/read big-endian UInt32`` () =
         let min = UInt32.MinValue
         let max = UInt32.MaxValue
-        let w (writer: ConnectionWriter) (value: UInt32) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadUInt32()
+        let w (writer: BigEndianWriter) (value: UInt32) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadUInt32()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -140,8 +140,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read big-endian UInt32`` () = async {
         let min = UInt32.MinValue
         let max = UInt32.MaxValue
-        let w (writer: ConnectionWriter) (value: UInt32) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadUInt32()
+        let w (writer: BigEndianWriter) (value: UInt32) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadUInt32()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
         
@@ -149,8 +149,8 @@ module ConnectionStreamTests =
     let ``Test should write/read big-endian Int64`` () =
         let min = Int64.MinValue
         let max = Int64.MaxValue
-        let w (writer: ConnectionWriter) (value: Int64) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadInt64()
+        let w (writer: BigEndianWriter) (value: Int64) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadInt64()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -158,8 +158,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read big-endian Int64`` () = async {
         let min = Int64.MinValue
         let max = Int64.MaxValue
-        let w (writer: ConnectionWriter) (value: Int64) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadInt64()
+        let w (writer: BigEndianWriter) (value: Int64) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadInt64()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
 
@@ -167,8 +167,8 @@ module ConnectionStreamTests =
     let ``Test should write/read big-endian UInt64`` () =
         let min = UInt64.MinValue
         let max = UInt64.MaxValue
-        let w (writer: ConnectionWriter) (value: UInt64) = writer.Write(value)
-        let r (reader: ConnectionReader) = reader.ReadUInt64()
+        let w (writer: BigEndianWriter) (value: UInt64) = writer.Write(value)
+        let r (reader: BigEndianReader) = reader.ReadUInt64()
         shouldWriteRead w r min
         shouldWriteRead w r max
         
@@ -176,8 +176,8 @@ module ConnectionStreamTests =
     let ``Test should async write/read big-endian UInt64`` () = async {
         let min = UInt64.MinValue
         let max = UInt64.MaxValue
-        let w (writer: ConnectionWriter) (value: UInt64) = writer.AsyncWrite(value)
-        let r (reader: ConnectionReader) = reader.AsyncReadUInt64()
+        let w (writer: BigEndianWriter) (value: UInt64) = writer.AsyncWrite(value)
+        let r (reader: BigEndianReader) = reader.AsyncReadUInt64()
         do! shouldAsyncWriteRead w r min
         do! shouldAsyncWriteRead w r max }
         
@@ -234,8 +234,8 @@ module ConnectionTests =
         let listener = ConnectionListener.tcpListen (IPEndPoint(IPAddress.Loopback, 65005))
         Async.Start(async {
             let! connection = listener.AsyncAcceptConnection()
-            let reader = new ConnectionReader(connection.Stream)
-            let writer = new ConnectionWriter(connection.Stream)
+            let reader = new BigEndianReader(connection.Stream)
+            let writer = new BigEndianWriter(connection.Stream)
             let x = reader.ReadInt32()
             let y = reader.ReadBytes(x)
             writer.Write x
@@ -244,8 +244,8 @@ module ConnectionTests =
         })
         Async.RunSynchronously(async {
             let! connection = Connection.asyncTcpConnect (IPEndPoint(IPAddress.Loopback, 65005))
-            let reader = new ConnectionReader(connection.Stream)
-            let writer = new ConnectionWriter(connection.Stream)
+            let reader = new BigEndianReader(connection.Stream)
+            let writer = new BigEndianWriter(connection.Stream)
             writer.Write 13
             writer.Write (Encoding.ASCII.GetBytes "Hello, World!")
             writer.Flush()
@@ -259,8 +259,8 @@ module ConnectionTests =
         let listener = ConnectionListener.tcpListen (IPEndPoint(IPAddress.Loopback, 65006))
         Async.Start(async {
             let! connection = listener.AsyncAcceptConnection()
-            let reader = new ConnectionReader(connection.Stream)
-            let writer = new ConnectionWriter(connection.Stream)
+            let reader = new BigEndianReader(connection.Stream)
+            let writer = new BigEndianWriter(connection.Stream)
             let! x = reader.AsyncReadInt32()
             let! y = reader.AsyncReadBytes(x)
             do! writer.AsyncWrite x
@@ -269,8 +269,8 @@ module ConnectionTests =
         })
         Async.RunSynchronously(async {
             let! connection = Connection.asyncTcpConnect (IPEndPoint(IPAddress.Loopback, 65006))
-            let reader = new ConnectionReader(connection.Stream)
-            let writer = new ConnectionWriter(connection.Stream)
+            let reader = new BigEndianReader(connection.Stream)
+            let writer = new BigEndianWriter(connection.Stream)
             do! writer.AsyncWrite 13
             do! writer.AsyncWrite (Encoding.ASCII.GetBytes "Hello, World!")
             do! writer.AsyncFlush()

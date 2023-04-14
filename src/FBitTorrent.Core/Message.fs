@@ -109,7 +109,7 @@ module Message =
     
     let [<Literal>] DefaultReadTimeoutMillis = 120_000
     
-    let rec write (writer: ConnectionWriter) (message: Message) =
+    let rec write (writer: BigEndianWriter) (message: Message) =
         match message with
         | KeepAliveMessage                   -> writeKeepAlive writer
         | ChokeMessage                       -> writeChoke writer 
@@ -178,7 +178,7 @@ module Message =
         writer.Write(port)
         writer.Flush()
     
-    let rec asyncWrite (writer: ConnectionWriter) (message: Message) = async {
+    let rec asyncWrite (writer: BigEndianWriter) (message: Message) = async {
         match message with
         | KeepAliveMessage                   -> return! asyncWriteKeepAlive writer
         | ChokeMessage                       -> return! asyncWriteChoke writer 
@@ -247,7 +247,7 @@ module Message =
         do! writer.AsyncWrite(port)
         do! writer.AsyncFlush() }
     
-    let rec read (reader: ConnectionReader) =
+    let rec read (reader: BigEndianReader) =
         match reader.ReadInt32() with
         | length when length < 0 -> readFailure ()
         | length when length = 0 -> readKeepAlive ()
@@ -302,7 +302,7 @@ module Message =
         let port = reader.ReadInt16()
         PortMessage port
         
-    let rec asyncRead (reader: ConnectionReader) = async {
+    let rec asyncRead (reader: BigEndianReader) = async {
         match! reader.AsyncReadInt32() with
         | length when length < 0 -> return! asyncReadFailure ()
         | length when length = 0 -> return! asyncReadKeepAlive ()
@@ -359,7 +359,7 @@ module Message =
 
     let toBytes message =
         use stream = new MemoryStream()
-        use writer = new ConnectionWriter(stream)
+        use writer = new BigEndianWriter(stream)
         write writer message
         stream.ToArray()
         
@@ -368,7 +368,7 @@ module Message =
     
     let fromBytes (bytes: byte[]) =
         use stream = new MemoryStream(bytes)
-        use reader = new ConnectionReader(stream)
+        use reader = new BigEndianReader(stream)
         read reader
         
     let fromString (string: string) =
