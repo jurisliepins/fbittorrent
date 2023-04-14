@@ -134,12 +134,9 @@ module Peer =
           DownRate       = Rate.zero
           UpRate         = Rate.zero }
     
-    type private LeechType =
+    type private Action =
         | FirstLeech
         | NextLeech
-    
-    type private Action =
-        | Leech of LeechType
         | KeepAlive
         | MeasureRate
     
@@ -194,33 +191,31 @@ module Peer =
         
         and handleAction pipeline leechOpt downMeter upMeter (state: State) action =
             match action with
-            | Leech leechType ->
-                match leechType with
-                | FirstLeech ->
-                    if not (Bitfield.isEmpty state.SelfBitfield) then
-                        streamRef <! Stream.WriteMessage (BitfieldMessage (state.SelfBitfield.ToArray()))
-                    if not (Bitfield.isFull state.SelfBitfield) then
-                        streamRef <! Stream.WriteMessage InterestedMessage
-                        let nextState = { state with SelfInterested = true }
-                        notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
-                        receive pipeline leechOpt downMeter upMeter nextState
-                    else
+            | FirstLeech ->
+                if not (Bitfield.isEmpty state.SelfBitfield) then
+                    streamRef <! Stream.WriteMessage (BitfieldMessage (state.SelfBitfield.ToArray()))
+                if not (Bitfield.isFull state.SelfBitfield) then
+                    streamRef <! Stream.WriteMessage InterestedMessage
+                    let nextState = { state with SelfInterested = true }
+                    notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
+                    receive pipeline leechOpt downMeter upMeter nextState
+                else
+                    receive pipeline leechOpt downMeter upMeter state
+            | NextLeech ->
+                match leechOpt, state with
+                | Some (idx, requests, responses), { PeerChoking = false } ->
+                    match BlockRequests.pop requests with 
+                    | Some block when not (BlockPipeline.isBacklogFilled requests responses pipeline)->
+                        streamRef <! Stream.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
+                        mailbox.Self <! NextLeech
                         receive pipeline leechOpt downMeter upMeter state
-                | NextLeech ->
-                    match leechOpt, state with
-                    | Some (idx, requests, responses), { PeerChoking = false } ->
-                        match BlockRequests.pop requests with 
-                        | Some block when not (BlockPipeline.isBacklogFilled requests responses pipeline)->
-                            streamRef <! Stream.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
-                            mailbox.Self <! Leech NextLeech
-                            receive pipeline leechOpt downMeter upMeter state
-                        | Some block ->
-                            streamRef <! Stream.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
-                            receive pipeline leechOpt downMeter upMeter state
-                        | None ->
-                            receive pipeline leechOpt downMeter upMeter state
-                    | _ ->
+                    | Some block ->
+                        streamRef <! Stream.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
                         receive pipeline leechOpt downMeter upMeter state
+                    | None ->
+                        receive pipeline leechOpt downMeter upMeter state
+                | _ ->
+                    receive pipeline leechOpt downMeter upMeter state
             | KeepAlive ->
                 streamRef <! Stream.WriteMessage KeepAliveMessage
                 mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(KeepAliveIntervalSec), mailbox.Self, KeepAlive)
@@ -267,7 +262,7 @@ module Peer =
                 | Some _ ->
                     receive pipeline leechOpt downMeter upMeter state
                 | None ->
-                    mailbox.Self <! Leech NextLeech
+                    mailbox.Self <! NextLeech
                     receive pipeline (Some (idx, BlockRequests.create length, BlockResponses.create length)) downMeter upMeter state
 
         and handleStreamCommandResult pipeline leechOpt downMeter upMeter (state: State) result =
@@ -289,7 +284,7 @@ module Peer =
                     notifiedRef <! Notification.Failed (Exception($"Failed to handshake invalid info-hash (expected: %s{Encoding.ASCII.GetString(selfInfoHash)}, received: %s{Encoding.ASCII.GetString(peerInfoHash)})"))
                     receive pipeline leechOpt downMeter upMeter state
                 | _ ->
-                    mailbox.Self <! Leech FirstLeech
+                    mailbox.Self <! FirstLeech
                     mailbox.Self <! KeepAlive
                     mailbox.Self <! MeasureRate
                     // TODO: Keep track of who initiated the handshake and if it was not us then write response handshake back.
@@ -312,7 +307,7 @@ module Peer =
                         // In this case we were in the process of leeching when we got choked. We reset the requests
                         // collection to make sure we don't miss any blocks we requested but never received and continue leeching. 
                         BlockRequests.reset requests responses
-                        mailbox.Self <! Leech NextLeech
+                        mailbox.Self <! NextLeech
                     | None ->
                         // We were idle when we got un-choked (usually the first un-choke for this peer), so we need to
                         // request for a new piece to start leeching. 
@@ -363,7 +358,7 @@ module Peer =
                         elif BlockRequests.isAllRequested requests then
                             receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState
                         else
-                            mailbox.Self <! Leech NextLeech
+                            mailbox.Self <! NextLeech
                             receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState
                     | _ ->
                         receive (BlockPipeline.update block.Length pipeline) leechOpt downMeter upMeter nextState
