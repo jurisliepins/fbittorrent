@@ -111,10 +111,9 @@ module Client =
             | Command.Add torrentState ->
                 match mailbox.Context.GetTorrent(torrentState.InfoHash) with
                 | ref when ref.IsNobody() ->
-                    let actorName = Torrent.actorName torrentState.InfoHash
-                    let _ = monitor (spawn mailbox actorName (Torrent.defaultActorBody mailbox.Self torrentState)) mailbox
+                    let _ = monitor (Torrent.spawn mailbox mailbox.Self torrentState) mailbox
                     mailbox.Context.Sender <! Success (Some torrentState.InfoHash, "Torrent added")
-                    state.Torrents.Add(actorName, createTorrentFromState torrentState)
+                    state.Torrents.Add((Torrent.actorName torrentState.InfoHash), createTorrentFromState torrentState)
                 | _ ->
                     mailbox.Context.Sender <! Failure (Some torrentState.InfoHash, "Torrent already exists")
                 receive state

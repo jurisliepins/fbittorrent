@@ -37,7 +37,7 @@ module Peer =
         
         let actorName () = "stream"
         
-        let actorFn (connection: IConnection) notifiedRef (initialState: State) (mailbox: Actor<obj>) =
+        let actorBody notifiedRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
             mailbox.Defer(connection.Dispose)
             let rec receive (state: State) = actor {
                 match! mailbox.Receive() with
@@ -93,7 +93,13 @@ module Peer =
             mailbox.Self <! ReadHandshake
             
             receive initialState
-//----------------------------------------------------------------------------------------------------------------------    
+            
+        let defaultActorBody notifiedRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
+            actorBody notifiedRef connection initialState mailbox
+            
+        let spawn (actorFactory: IActorRefFactory) notifiedRef connection (initialState: State) =
+            spawn actorFactory (actorName ()) (defaultActorBody notifiedRef connection initialState)
+    
     let [<Literal>] KeepAliveIntervalSec = 30.0
     
     let [<Literal>] MeasureRateIntervalSec = 1.0
@@ -160,7 +166,7 @@ module Peer =
     
     let actorBody notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
-        let streamRef = spawn mailbox (Stream.actorName ()) (Stream.actorFn connection mailbox.Self (Stream.createState ()))
+        let streamRef = Stream.spawn mailbox mailbox.Self connection (Stream.createState ())
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action ->

@@ -117,10 +117,10 @@ module Torrent =
     
     let actorBody notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
-        let announcerRef = spawn mailbox (Announcer.actorName ()) Announcer.defaultActorBody
-        let connectorRef = spawn mailbox (Connector.actorName ()) Connector.defaultActorBody
-        let ioRef = spawn mailbox (IO.actorName ()) (IO.defaultActorBody (IO.createState initialState.Settings.RootDirPath initialState.PieceLength initialState.Pieces initialState.Files)) 
-        let piecesRef = spawn mailbox (Pieces.actorName ()) (Pieces.defaultActorBody mailbox.Self (Pieces.createState initialState.Bitfield initialState.Pieces))
+        let announcerRef = Announcer.spawn mailbox
+        let connectorRef = Connector.spawn mailbox
+        let ioRef = IO.spawn mailbox (IO.createState initialState.Settings.RootDirPath initialState.PieceLength initialState.Pieces initialState.Files) 
+        let piecesRef = Pieces.spawn mailbox mailbox.Self (Pieces.createState initialState.Bitfield initialState.Pieces)
         let rec receive (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action -> 
@@ -269,11 +269,10 @@ module Torrent =
                 match state with
                 | { Status = Started } ->
                     if mailbox.Context.GetPeers().Count() < state.Settings.MaxSeedCount then
-                        let actorName = Peer.actorName connection.RemoteEndpoint
-                        let actorFn = Peer.defaultActorBody mailbox.Self piecesRef connection (Peer.createState (Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray())) (Bitfield.create state.Bitfield.Capacity))
-                        let ref = monitor (spawn mailbox actorName actorFn) mailbox
+                        let initialState = (Peer.createState (Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray())) (Bitfield.create state.Bitfield.Capacity))
+                        let ref = monitor (Peer.spawn mailbox mailbox.Self piecesRef connection initialState) mailbox
                         ref <! Peer.InitiateHandshake
-                        piecesRef <! Pieces.PeerJoined (actorName, Bitfield.create state.Bitfield.Capacity)
+                        piecesRef <! Pieces.PeerJoined ((Peer.actorName connection.RemoteEndpoint), Bitfield.create state.Bitfield.Capacity)
                         logInfo mailbox $"Connected to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port}"
                         receive downMeter upMeter state
                     else 

@@ -16,7 +16,7 @@ module Program =
             """
             |> ConfigurationFactory.ParseString
         let system = ActorSystem.create "fbittorrent-system" config
-        let clientRef = spawn system (Client.actorName ()) (Client.defaultActorBody (Client.createState ()))
+        let clientRef = Client.spawn system (Client.createState ())
         Repl.repl system clientRef
         
     [<EntryPoint>]
