@@ -11,7 +11,7 @@ open FBitTorrent.Core
 
 module Peer =
     
-    module Connection =
+    module Stream =
         
         type State =
             { Placeholder: unit }
@@ -33,9 +33,9 @@ module Peer =
         type Notification =
             | ReceivedHandshake of Handshake: Handshake
             | ReceivedMessage   of Message: Message
-            | ReceivingFailed   of Error: Exception
+            | Failed            of Error: Exception
         
-        let actorName () = "connection"
+        let actorName () = "stream"
         
         let actorFn (connection: IConnection) notifiedRef (initialState: State) (mailbox: Actor<obj>) =
             mailbox.Defer(connection.Dispose)
@@ -59,7 +59,7 @@ module Peer =
                             mailbox.Self <! ReadMessage
                             return ReceivedHandshake handshake
                         with exn ->
-                            return ReceivingFailed (Exception("Failed to read handshake", exn))
+                            return Failed (Exception("Failed to read handshake", exn))
                     }).PipeTo(notifiedRef) |> ignore
                 | ReadMessage -> 
                     Async.StartAsTask(async {
@@ -68,7 +68,7 @@ module Peer =
                             mailbox.Self <! ReadMessage
                             return ReceivedMessage message
                         with exn ->
-                            return ReceivingFailed (Exception("Failed to read message", exn))
+                            return Failed (Exception("Failed to read message", exn))
                     }).PipeTo(notifiedRef) |> ignore
                 receive state
             
@@ -93,12 +93,6 @@ module Peer =
             mailbox.Self <! ReadHandshake
             
             receive initialState
-            
-        let defaultActorFn connection notifiedRef mailbox = actorFn connection notifiedRef mailbox
-        
-    module ConnectionExtensions =
-        type IActorContext with
-            member __.GetConnection() : IActorRef = __.Child(Connection.actorName ())
 //----------------------------------------------------------------------------------------------------------------------    
     let [<Literal>] KeepAliveIntervalSec = 30.0
     
@@ -164,9 +158,9 @@ module Peer =
     
     let actorName (address: IPAddress) (port: int) = $"peer-%A{address}:%d{port}"
     
-    let actorFn connectionFn notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
+    let actorFn notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
-        let connectionRef = spawn mailbox (Connection.actorName ()) (connectionFn connection mailbox.Self (Connection.createState ()))
+        let streamRef = spawn mailbox (Stream.actorName ()) (Stream.actorFn connection mailbox.Self (Stream.createState ()))
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action ->
@@ -181,11 +175,11 @@ module Peer =
             | :? Pieces.Response as response ->
                 return! handlePiecesResponse pipeline leechOpt downMeter upMeter state response
             
-            | :? Connection.CommandResult as result ->
-                return! handleConnectionCommandResult pipeline leechOpt downMeter upMeter state result
+            | :? Stream.CommandResult as result ->
+                return! handleStreamCommandResult pipeline leechOpt downMeter upMeter state result
             
-            | :? Connection.Notification as notification ->
-                return! handleConnectionNotification pipeline leechOpt downMeter upMeter state notification
+            | :? Stream.Notification as notification ->
+                return! handleStreamNotification pipeline leechOpt downMeter upMeter state notification
                         
             | message ->
                 return! unhandled pipeline leechOpt downMeter upMeter state message }
@@ -196,9 +190,9 @@ module Peer =
                 match leechType with
                 | FirstLeech ->
                     if not (Bitfield.isEmpty state.SelfBitfield) then
-                        connectionRef <! Connection.WriteMessage (BitfieldMessage (state.SelfBitfield.ToArray()))
+                        streamRef <! Stream.WriteMessage (BitfieldMessage (state.SelfBitfield.ToArray()))
                     if not (Bitfield.isFull state.SelfBitfield) then
-                        connectionRef <! Connection.WriteMessage InterestedMessage
+                        streamRef <! Stream.WriteMessage InterestedMessage
                         let nextState = { state with SelfInterested = true }
                         notifiedRef <! FlagsChanged (nextState.SelfChoking, nextState.SelfInterested, nextState.PeerChoking, nextState.PeerInterested)
                         receive pipeline leechOpt downMeter upMeter nextState
@@ -209,18 +203,18 @@ module Peer =
                     | Some (idx, requests, responses), { PeerChoking = false } ->
                         match BlockRequests.pop requests with 
                         | Some block when not (BlockPipeline.isBacklogFilled requests responses pipeline)->
-                            connectionRef <! Connection.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
+                            streamRef <! Stream.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
                             mailbox.Self <! Leech NextLeech
                             receive pipeline leechOpt downMeter upMeter state
                         | Some block ->
-                            connectionRef <! Connection.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
+                            streamRef <! Stream.WriteMessage (RequestMessage (idx, block.Beginning, block.Length))
                             receive pipeline leechOpt downMeter upMeter state
                         | None ->
                             receive pipeline leechOpt downMeter upMeter state
                     | _ ->
                         receive pipeline leechOpt downMeter upMeter state
             | KeepAlive ->
-                connectionRef <! Connection.WriteMessage KeepAliveMessage
+                streamRef <! Stream.WriteMessage KeepAliveMessage
                 mailbox.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(KeepAliveIntervalSec), mailbox.Self, KeepAlive)
                 receive pipeline leechOpt downMeter upMeter state
             | MeasureRate ->
@@ -237,7 +231,7 @@ module Peer =
         and handleCommand pipeline leechOpt downMeter upMeter (state: State) command =
             match command with
             | InitiateHandshake ->
-                connectionRef <! Connection.WriteHandshake state.SelfHandshake
+                streamRef <! Stream.WriteHandshake state.SelfHandshake
                 receive pipeline leechOpt downMeter upMeter state
         
         and handleMessage pipeline leechOpt downMeter upMeter (state: State) message =
@@ -248,13 +242,13 @@ module Peer =
                     for request in requests do
                         match request with
                         | BlockRequest.Requested { Beginning = beg; Length = length } ->
-                            connectionRef <! Connection.WriteMessage (CancelMessage (idx, beg, length))
+                            streamRef <! Stream.WriteMessage (CancelMessage (idx, beg, length))
                         | _ -> ()
-                    connectionRef <! Connection.WriteMessage (HaveMessage idx)
+                    streamRef <! Stream.WriteMessage (HaveMessage idx)
                     state.SelfBitfield |> Bitfield.setBit idx true
                     receive pipeline None downMeter upMeter state
                 | _ ->
-                    connectionRef <! Connection.WriteMessage (HaveMessage idx)
+                    streamRef <! Stream.WriteMessage (HaveMessage idx)
                     state.SelfBitfield |> Bitfield.setBit idx true
                     receive pipeline leechOpt downMeter upMeter state
         
@@ -268,15 +262,15 @@ module Peer =
                     mailbox.Self <! Leech NextLeech
                     receive pipeline (Some (idx, BlockRequests.create length, BlockResponses.create length)) downMeter upMeter state
 
-        and handleConnectionCommandResult pipeline leechOpt downMeter upMeter (state: State) result =
+        and handleStreamCommandResult pipeline leechOpt downMeter upMeter (state: State) result =
             match result with
-            | Connection.WriteFailure error ->
+            | Stream.WriteFailure error ->
                 notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
             receive pipeline leechOpt downMeter upMeter state
         
-        and handleConnectionNotification pipeline leechOpt downMeter upMeter (state: State) notification =
+        and handleStreamNotification pipeline leechOpt downMeter upMeter (state: State) notification =
             match notification with
-            | Connection.ReceivedHandshake peerHandshake ->
+            | Stream.ReceivedHandshake peerHandshake ->
                 let isProtocolValid (selfProtocol: byte[]) (peerProtocol: byte[]) = Enumerable.SequenceEqual(selfProtocol, peerProtocol)
                 let isInfoHashValid (selfInfoHash: byte[]) (peerInfoHash: byte[]) = Enumerable.SequenceEqual(selfInfoHash, peerInfoHash)
                 match (state.SelfHandshake, peerHandshake) with
@@ -290,9 +284,10 @@ module Peer =
                     mailbox.Self <! Leech FirstLeech
                     mailbox.Self <! KeepAlive
                     mailbox.Self <! MeasureRate
+                    // TODO: Keep track of who initiated the handshake and if it was not us then write response handshake back.
                     receive pipeline leechOpt downMeter upMeter { state with PeerHandshake = Some peerHandshake }
                 
-            | Connection.ReceivedMessage message ->
+            | Stream.ReceivedMessage message ->
                 match message with
                 | KeepAliveMessage ->
                     receive pipeline leechOpt downMeter upMeter state
@@ -369,7 +364,7 @@ module Peer =
                     mailbox.Unhandled(message)
                     receive pipeline leechOpt downMeter upMeter state
                     
-            | Connection.ReceivingFailed error ->
+            | Stream.Failed error ->
                 notifiedRef <! Notification.Failed (Exception("Peer failed to read", error))
                 receive pipeline leechOpt downMeter upMeter state
         
@@ -380,7 +375,7 @@ module Peer =
         receive (BlockPipeline.create ()) None (RateMeter.create ()) (RateMeter.create ()) initialState
             
     let defaultActorFn notifiedRef piecesRef connection initialState mailbox =
-        actorFn Connection.actorFn notifiedRef piecesRef connection initialState mailbox
+        actorFn notifiedRef piecesRef connection initialState mailbox
 
 module PeerExtensions =
     type IActorContext with
