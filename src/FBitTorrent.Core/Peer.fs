@@ -282,10 +282,10 @@ module Peer =
                 let isProtocolValid (selfProtocol: byte[]) (peerProtocol: byte[]) = Enumerable.SequenceEqual(selfProtocol, peerProtocol)
                 let isInfoHashValid (selfInfoHash: byte[]) (peerInfoHash: byte[]) = Enumerable.SequenceEqual(selfInfoHash, peerInfoHash)
                 match (state.SelfHandshake, peerHandshake) with
-                | Handshake (selfProtocol, _, _, _), Handshake (peerProtocol, _, _, _) when not (isProtocolValid selfProtocol peerProtocol)  ->
+                | Handshake (selfProtocol, _, _, _), Handshake (peerProtocol, _, _, _) when not (isProtocolValid selfProtocol peerProtocol) ->
                     notifiedRef <! Notification.Failed (Exception($"Failed to handshake invalid protocol (expected: %s{Encoding.ASCII.GetString(selfProtocol)}, received: %s{Encoding.ASCII.GetString(peerProtocol)})"))
                     receive pipeline leechOpt downMeter upMeter state
-                | Handshake (_, _, selfInfoHash, _), Handshake (_, _, peerInfoHash, _) when not (isInfoHashValid selfInfoHash peerInfoHash)  ->
+                | Handshake (_, _, selfInfoHash, _), Handshake (_, _, peerInfoHash, _) when not (isInfoHashValid selfInfoHash peerInfoHash) ->
                     notifiedRef <! Notification.Failed (Exception($"Failed to handshake invalid info-hash (expected: %s{Encoding.ASCII.GetString(selfInfoHash)}, received: %s{Encoding.ASCII.GetString(peerInfoHash)})"))
                     receive pipeline leechOpt downMeter upMeter state
                 | _ ->
