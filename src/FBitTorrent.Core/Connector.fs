@@ -1,9 +1,7 @@
 namespace FBitTorrent.Core
 
 open System
-open System.Linq
 open System.Net
-open System.Text
 open Akka.Actor
 open Akka.FSharp
 open FBitTorrent.Core
@@ -11,11 +9,11 @@ open FBitTorrent.Core
 module Connector =
     
     type Command =
-        | Connect of Address: IPAddress * Port: int
+        | Connect of Endpoint: IPEndPoint
         
     type CommandResult =
         | ConnectSuccess of Connection: IConnection
-        | ConnectFailure of Address: IPAddress * Port: int * Error: Exception
+        | ConnectFailure of Endpoint: IPEndPoint * Error: Exception
     
     let actorName () = "connector"
     
@@ -30,16 +28,16 @@ module Connector =
         
         and handleCommand command =
             match command with
-            | Connect (address, port) ->
+            | Connect endpoint ->
                 Async.StartAsTask(async {
                     try
-                        let! connection = asyncConnect (IPEndPoint(address, port))
+                        let! connection = asyncConnect endpoint
                         return ConnectSuccess connection    
                     with exn ->
-                        return ConnectFailure (address, port, Exception($"Failed to connect to %A{address}:%d{port}", exn)) }
+                        return ConnectFailure (endpoint, Exception($"Failed to connect to %A{endpoint.Address}:%d{endpoint.Port}", exn)) }
                 ).PipeTo(mailbox.Context.Sender) |> ignore
                 receive ()
-        
+       
         and unhandled message =
             mailbox.Unhandled(message)
             receive ()

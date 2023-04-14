@@ -21,16 +21,14 @@ module Torrent =
           MaxSeedCount: int
           Protocol:     byte[]
           Reserved:     byte[] 
-          Address:      IPAddress
-          Port:         int }
+          BindEndpoint: IPEndPoint }
         
     let defaultSettings =
         { RootDirPath  = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
           MaxSeedCount = 200
           Protocol     = Handshake.protocolBytes
           Reserved     = Handshake.reservedBytes
-          Address      = IPAddress.Any
-          Port         = 6881 }
+          BindEndpoint = IPEndPoint(IPAddress.Any, 6881) }
     
     type Status =
         | Started
@@ -96,7 +94,7 @@ module Torrent =
         { Url        = state.Announce
           InfoHash   = state.InfoHash
           PeerId     = state.PeerId
-          Port       = state.Settings.Port
+          Port       = state.Settings.BindEndpoint.Port
           Downloaded = state.Downloaded
           Uploaded   = state.Uploaded
           Left       = state.Left
@@ -216,7 +214,7 @@ module Torrent =
                                     |> List.distinctBy (fun peer -> $"%A{peer.Address}:%d{peer.Port}")
                                     |> List.truncate (state.Settings.MaxSeedCount - mailbox.Context.GetPeers().Count()) do
                             logInfo mailbox $"Connecting to %A{peer.Address}:%d{peer.Port}"
-                            connectorRef <! Connector.Connect (peer.Address, peer.Port)
+                            connectorRef <! Connector.Connect peer
                         logDebug mailbox $"Scheduling re-announce after '%.2f{float interval} sec' on %s{state.Announce}"
                         announcerRef <! Announcer.ScheduleAnnounce ((createRefreshedAnnounceArgs state), float interval)
                         receive downMeter upMeter state
@@ -283,8 +281,8 @@ module Torrent =
                     logDebug mailbox $"Not connecting to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port} torrent not in started state anymore"
                     connection.Disconnect()
                     receive downMeter upMeter state
-            | Connector.ConnectFailure (address, port, error) ->
-                logError mailbox $"Failed to connect to %A{address}:%d{port} %A{error}"
+            | Connector.ConnectFailure (endpoint, error) ->
+                logError mailbox $"Failed to connect to %A{endpoint.Address}:%d{endpoint.Port} %A{error}"
                 receive downMeter upMeter state
         
         and handlePiecesNotification downMeter upMeter (state: State) notification =
