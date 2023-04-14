@@ -131,7 +131,7 @@ module Pieces =
         
     let actorName () = "pieces"
     
-    let actorFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
+    let actorBody notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
         let rec receive (state: State) = actor {
             match! mailbox.Receive() with
@@ -236,8 +236,11 @@ module Pieces =
                     
         receive initialState
     
-    let defaultActorFn notifiedRef initialState mailbox =
-        actorFn notifiedRef initialState mailbox
+    let defaultActorBody notifiedRef initialState mailbox =
+        actorBody notifiedRef initialState mailbox
+        
+    let spawn (actorFactory: IActorRefFactory) notifiedRef (initialState: State) =
+        spawn actorFactory (actorName ()) (defaultActorBody notifiedRef initialState)
         
 module PiecesExtensions =
     type IActorContext with

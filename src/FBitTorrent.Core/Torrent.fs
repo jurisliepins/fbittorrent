@@ -115,12 +115,12 @@ module Torrent =
     let private createRefreshedAnnounceArgs (state: State) : Announcer.AnnounceArgs =
         createAnnounceArgs state None
     
-    let actorFn announcerFn connectorFn piecesFn ioFn peerFn notifiedRef (initialState: State) (mailbox: Actor<obj>) =
+    let actorBody notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
-        let announcerRef = spawn mailbox (Announcer.actorName ()) announcerFn
-        let connectorRef = spawn mailbox (Connector.actorName ()) connectorFn
-        let ioRef = spawn mailbox (IO.actorName ()) (ioFn (IO.createState initialState.Settings.RootDirPath initialState.PieceLength initialState.Pieces initialState.Files)) 
-        let piecesRef = spawn mailbox (Pieces.actorName ()) (piecesFn mailbox.Self (Pieces.createState initialState.Bitfield initialState.Pieces))
+        let announcerRef = spawn mailbox (Announcer.actorName ()) Announcer.defaultActorBody
+        let connectorRef = spawn mailbox (Connector.actorName ()) Connector.defaultActorBody
+        let ioRef = spawn mailbox (IO.actorName ()) (IO.defaultActorBody (IO.createState initialState.Settings.RootDirPath initialState.PieceLength initialState.Pieces initialState.Files)) 
+        let piecesRef = spawn mailbox (Pieces.actorName ()) (Pieces.defaultActorBody mailbox.Self (Pieces.createState initialState.Bitfield initialState.Pieces))
         let rec receive (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action -> 
@@ -212,7 +212,7 @@ module Torrent =
                     | None 
                     | Some Announcer.Started when state.Left > 0 ->
                         for peer in peers
-                                    |> List.filter (fun peer -> mailbox.Context.GetPeer(peer.Address, peer.Port).IsNobody())
+                                    |> List.filter (fun peer -> mailbox.Context.GetPeer(peer).IsNobody())
                                     |> List.distinctBy (fun peer -> $"%A{peer.Address}:%d{peer.Port}")
                                     |> List.truncate (state.Settings.MaxSeedCount - mailbox.Context.GetPeers().Count()) do
                             logInfo mailbox $"Connecting to %A{peer.Address}:%d{peer.Port}"
@@ -269,8 +269,8 @@ module Torrent =
                 match state with
                 | { Status = Started } ->
                     if mailbox.Context.GetPeers().Count() < state.Settings.MaxSeedCount then
-                        let actorName = Peer.actorName connection.RemoteEndpoint.Address connection.RemoteEndpoint.Port
-                        let actorFn = peerFn mailbox.Self piecesRef connection (Peer.createState (Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray())) (Bitfield.create state.Bitfield.Capacity))
+                        let actorName = Peer.actorName connection.RemoteEndpoint
+                        let actorFn = Peer.defaultActorBody mailbox.Self piecesRef connection (Peer.createState (Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray())) (Bitfield.create state.Bitfield.Capacity))
                         let ref = monitor (spawn mailbox actorName actorFn) mailbox
                         ref <! Peer.InitiateHandshake
                         piecesRef <! Pieces.PeerJoined (actorName, Bitfield.create state.Bitfield.Capacity)
@@ -317,8 +317,11 @@ module Torrent =
 
         receive (RateMeter.createFromBytes initialState.Downloaded) (RateMeter.createFromBytes initialState.Uploaded) initialState
     
-    let defaultActorFn notifiedRef initialState (mailbox: Actor<obj>) =
-        actorFn Announcer.defaultActorFn Connector.defaultActorFn Pieces.defaultActorFn IO.defaultActorFn Peer.defaultActorFn notifiedRef initialState mailbox
+    let defaultActorBody notifiedRef initialState (mailbox: Actor<obj>) =
+        actorBody notifiedRef initialState mailbox
+        
+    let spawn (actorFactory: IActorRefFactory) notifiedRef (initialState: State) =
+        spawn actorFactory (actorName initialState.InfoHash) (defaultActorBody notifiedRef initialState)
         
 module TorrentExtensions =
     type IActorContext with

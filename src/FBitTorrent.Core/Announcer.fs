@@ -46,7 +46,7 @@ module Announcer =
     
     let actorName () = "announcer"
     
-    let actorFn query (mailbox: Actor<obj>) =
+    let actorBody query (mailbox: Actor<obj>) =
         let rec receive () = actor {
             match! mailbox.Receive() with
             | :? Command as command -> 
@@ -92,8 +92,11 @@ module Announcer =
             receive () 
         
         receive ()
-        
-    let defaultActorFn mailbox = actorFn Tracker.httpQuery mailbox
+
+    let defaultActorBody mailbox = actorBody Tracker.httpQuery mailbox
+    
+    let spawn (actorFactory: IActorRefFactory) =
+        spawn actorFactory (actorName ()) defaultActorBody
     
 module AnnouncerExtensions =
     type IActorContext with

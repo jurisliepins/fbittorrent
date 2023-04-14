@@ -88,7 +88,7 @@ module Client =
     
     let actorName () = "client"
     
-    let actorFn torrentFn (initialState: State) (mailbox: Actor<obj>) =
+    let actorBody (initialState: State) (mailbox: Actor<obj>) =
         let rec receive (state: State) = actor {
             match! mailbox.Receive() with
             | :? Command as command ->
@@ -112,7 +112,7 @@ module Client =
                 match mailbox.Context.GetTorrent(torrentState.InfoHash) with
                 | ref when ref.IsNobody() ->
                     let actorName = Torrent.actorName torrentState.InfoHash
-                    let _ = monitor (spawn mailbox actorName (torrentFn mailbox.Self torrentState)) mailbox
+                    let _ = monitor (spawn mailbox actorName (Torrent.defaultActorBody mailbox.Self torrentState)) mailbox
                     mailbox.Context.Sender <! Success (Some torrentState.InfoHash, "Torrent added")
                     state.Torrents.Add(actorName, createTorrentFromState torrentState)
                 | _ ->
@@ -213,8 +213,11 @@ module Client =
         
         receive initialState
         
-    let defaultActorFn initialState (mailbox: Actor<obj>) =
-        actorFn Torrent.defaultActorFn initialState mailbox
+    let defaultActorBody initialState (mailbox: Actor<obj>) =
+        actorBody initialState mailbox
+        
+    let spawn (actorFactory: IActorRefFactory) (initialState: State) =
+        spawn actorFactory (actorName ()) (defaultActorBody initialState)
         
 module ClientExtensions =
     type IActorContext with

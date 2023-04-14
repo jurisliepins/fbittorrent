@@ -156,9 +156,9 @@ module Peer =
         | RateChanged     of Down: Rate * Up: Rate
         | Failed          of Error: Exception
     
-    let actorName (address: IPAddress) (port: int) = $"peer-%A{address}:%d{port}"
+    let actorName (endpoint: IPEndPoint) = $"peer-%A{endpoint.Address}:%d{endpoint.Port}"
     
-    let actorFn notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
+    let actorBody notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
         let streamRef = spawn mailbox (Stream.actorName ()) (Stream.actorFn connection mailbox.Self (Stream.createState ()))
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
@@ -374,10 +374,13 @@ module Peer =
         
         receive (BlockPipeline.create ()) None (RateMeter.create ()) (RateMeter.create ()) initialState
             
-    let defaultActorFn notifiedRef piecesRef connection initialState mailbox =
-        actorFn notifiedRef piecesRef connection initialState mailbox
+    let defaultActorBody notifiedRef piecesRef connection initialState mailbox =
+        actorBody notifiedRef piecesRef connection initialState mailbox
+        
+    let spawn (actorFactory: IActorRefFactory) notifiedRef piecesRef (connection: IConnection) (initialState: State) =
+        spawn actorFactory (actorName connection.RemoteEndpoint) (defaultActorBody notifiedRef piecesRef connection initialState)
 
 module PeerExtensions =
     type IActorContext with
-        member __.GetPeer(address: IPAddress, port: int) : IActorRef = __.Child(Peer.actorName address port)
+        member __.GetPeer(endpoint: IPEndPoint) : IActorRef = __.Child(Peer.actorName endpoint)
         member __.GetPeers() : IEnumerable<IActorRef> = __.GetChildren().Where(fun ref -> ref.Path.Name.StartsWith("peer"))

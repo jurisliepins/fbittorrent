@@ -87,7 +87,7 @@ module IO =
     
     let actorName () = "io"
     
-    let actorFn (fs: IFileSystem) (initialState: State) (mailbox: Actor<obj>) =
+    let actorBody (fs: IFileSystem) (initialState: State) (mailbox: Actor<obj>) =
         let rec receive (state: State) = actor {
             match! mailbox.Receive() with
             | :? Command as command -> 
@@ -133,8 +133,11 @@ module IO =
         
         receive initialState
         
-    let defaultActorFn initialState mailbox =
-        actorFn (FileSystem.createLocal ()) initialState mailbox
+    let defaultActorBody initialState mailbox =
+        actorBody (FileSystem.createLocal ()) initialState mailbox
+        
+    let spawn (actorFactory: IActorRefFactory) (initialState: State) =
+        spawn actorFactory (actorName ()) (defaultActorBody initialState)
         
 module IOExtensions =
     type IActorContext with

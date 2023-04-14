@@ -19,7 +19,7 @@ module Connector =
     
     let actorName () = "connector"
     
-    let actorFn (asyncConnect: IPEndPoint -> Async<IConnection>) (mailbox: Actor<obj>) =
+    let actorBody (asyncConnect: IPEndPoint -> Async<IConnection>) (mailbox: Actor<obj>) =
         let rec receive () = actor {
             match! mailbox.Receive() with
             | :? Command as command ->
@@ -46,7 +46,10 @@ module Connector =
         
         receive ()
         
-    let defaultActorFn mailbox = actorFn Connection.asyncTcpConnect mailbox
+    let defaultActorBody mailbox = actorBody Connection.asyncTcpConnect mailbox
+    
+    let spawn (actorFactory: IActorRefFactory) =
+        spawn actorFactory (actorName ()) defaultActorBody 
     
 module ConnectorExtensions =
     type IActorContext with
