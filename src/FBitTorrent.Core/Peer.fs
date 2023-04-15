@@ -28,7 +28,7 @@ module Peer =
               Pipe    = SomethingStream() }
         
         type private Action =
-            | PipeRead
+            | ReadCurrent
         
         type Command =
             | WriteHandshake of Handshake: Handshake
@@ -88,12 +88,11 @@ module Peer =
             connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 beg))
             connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 length))
         and private writePiece connectionRef (idx: int) (beg: int) (block: ByteBuffer) =
-            failwith "Writing piece is not supported"
-            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (9 + block.Length)))
-            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (PieceType.ToByte()) |]))
-            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 idx))
-            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 beg))
-            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(block.ToArray()))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (9 + block.Length)))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (PieceType.ToByte()) |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 idx))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 beg))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(block.ToArray()))
         and private writeCancel connectionRef (idx: int) (beg: int) (length: int) =
             connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (1 + 12)))
             connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (CancelType.ToByte()) |]))
@@ -158,6 +157,11 @@ module Peer =
             let port = reader.ReadInt16()
             PortMessage port
         
+        let handshakeHeaderAvailable (stream: Stream)                = (stream.Length - stream.Position) >= sizeof<byte>
+        let handshakeBodyAvailable   (stream: Stream) (length: byte) = (stream.Length - stream.Position) >= int64 (length + 8uy + 20uy + 20uy)
+        let messageHeaderAvailable   (stream: Stream)                = (stream.Length - stream.Position) >= sizeof<int32>
+        let messageBodyAvailable     (stream: Stream) (length: int)  = (stream.Length - stream.Position) >= int64 length
+        
         let actorName () = "stream"
         
         let actorBody notifiedRef connectionRef (initialState: State) (mailbox: Actor<obj>) =
@@ -178,47 +182,55 @@ module Peer =
             
             and handleAction (state: State) action =
                 match action with
-                | PipeRead ->
+                | ReadCurrent ->
                     try
                         match state with
-                        | { Status = AwaitingHandshakeHeader } when (state.Pipe.Length - state.Pipe.Position) >= sizeof<byte> ->
-                            let reader = new BigEndianReader(state.Pipe)
-                            let length = reader.ReadByte()
-                            logInfo mailbox $"Read handshake header %d{length}"
-                            mailbox.Self <! PipeRead
-                            receive { state with Status = AwaitingHandshakeBody length }
-                        | { Status = AwaitingHandshakeBody length } when (state.Pipe.Length - state.Pipe.Position) >= int64 (length + 8uy + 20uy + 20uy) ->
-                            let reader = new BigEndianReader(state.Pipe)
-                            let handshake = readHandshake reader length
-                            logInfo mailbox "Read handshake"
-                            notifiedRef <! ReceivedHandshake handshake
-                            mailbox.Self <! PipeRead
-                            receive { state with Status = AwaitingMessageHeader }
-                        | { Status = AwaitingMessageHeader } when (state.Pipe.Length - state.Pipe.Position) >= sizeof<int32> ->
-                            let reader = new BigEndianReader(state.Pipe)
-                            let length = reader.ReadInt32()
-                            logInfo mailbox $"Read message header %d{length}"
-                            if length < 0 then
-                                failwith "Received negative value for message length"
-                            elif length = 0 then
-                                notifiedRef <! ReceivedMessage KeepAliveMessage
-                                mailbox.Self <! PipeRead
-                                receive { state with Status = AwaitingMessageHeader }
-                            else 
-                                mailbox.Self <! PipeRead
-                                receive { state with Status = AwaitingMessageBody length }
-                        | { Status = AwaitingMessageBody length } when (state.Pipe.Length - state.Pipe.Position) >= int64 length ->
-                            let reader = new BigEndianReader(state.Pipe)
-                            let message = readMessage reader length
-                            logInfo mailbox "Read message"
-                            notifiedRef <! ReceivedMessage message
-                            mailbox.Self <! PipeRead
-                            receive { state with Status = AwaitingMessageHeader }
+                        | { Status = AwaitingHandshakeHeader }      when handshakeHeaderAvailable state.Pipe        -> handleHandshakeHeader state
+                        | { Status = AwaitingHandshakeBody length } when handshakeBodyAvailable   state.Pipe length -> handleHandshakeBody   state length
+                        | { Status = AwaitingMessageHeader }        when messageHeaderAvailable   state.Pipe        -> handleMessageHeader   state
+                        | { Status = AwaitingMessageBody length }   when messageBodyAvailable     state.Pipe length -> handleMessageBody     state length
                         | _ ->
                             receive state
                     with exn ->
                         notifiedRef <! Failed (Exception("Failed to read bytes", exn))
                         receive state
+                        
+            and handleHandshakeHeader (state: State) =
+                let reader = new BigEndianReader(state.Pipe)
+                let length = reader.ReadByte()
+                logInfo mailbox $"Read handshake header %d{length}"
+                mailbox.Self <! ReadCurrent
+                receive { state with Status = AwaitingHandshakeBody length }
+                
+            and handleHandshakeBody (state: State) length =
+                let reader = new BigEndianReader(state.Pipe)
+                let handshake = readHandshake reader length
+                logInfo mailbox "Read handshake"
+                notifiedRef <! ReceivedHandshake handshake
+                mailbox.Self <! ReadCurrent
+                receive { state with Status = AwaitingMessageHeader }
+                
+            and handleMessageHeader (state: State) =
+                let reader = new BigEndianReader(state.Pipe)
+                let length = reader.ReadInt32()
+                logInfo mailbox $"Read message header %d{length}"
+                if length < 0 then
+                    failwith "Received negative value for message length"
+                if length = 0 then
+                    notifiedRef <! ReceivedMessage KeepAliveMessage
+                    mailbox.Self <! ReadCurrent
+                    receive { state with Status = AwaitingMessageHeader }
+                else 
+                    mailbox.Self <! ReadCurrent
+                    receive { state with Status = AwaitingMessageBody length }
+            
+            and handleMessageBody (state: State) length =
+                let reader = new BigEndianReader(state.Pipe)
+                let message = readMessage reader length
+                logInfo mailbox "Read message"
+                notifiedRef <! ReceivedMessage message
+                mailbox.Self <! ReadCurrent
+                receive { state with Status = AwaitingMessageHeader }
             
             and handleCommand (state: State) command =
                 match command with
@@ -239,7 +251,7 @@ module Peer =
                 | :? Tcp.Received as received ->
                     try
                         received.Data.WriteTo(state.Pipe)
-                        mailbox.Self <! PipeRead
+                        mailbox.Self <! ReadCurrent
                     with exn ->
                         notifiedRef <! Failed (Exception("Failed to receive bytes", exn))
                     receive state
