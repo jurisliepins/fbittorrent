@@ -109,6 +109,8 @@ module Message =
     
     let [<Literal>] DefaultReadTimeoutMillis = 120_000
     
+    let [<Literal>] MessageLengthLimit = 32768
+    
     let rec write (writer: ConnectionWriter) (message: Message) =
         match message with
         | KeepAliveMessage                   -> writeKeepAlive writer
@@ -249,7 +251,8 @@ module Message =
     
     let rec read (reader: ConnectionReader) =
         match reader.ReadInt32() with
-        | length when length < 0 -> readFailure ()
+        | length when length < 0                  -> failwith "Received negative value for message length"
+        | length when length > MessageLengthLimit -> failwith $"Not accepting messages longer than %d{MessageLengthLimit} bytes"
         | length when length = 0 -> readKeepAlive ()
         | length ->
             match MessageType.FromByte(reader.ReadByte()) with
@@ -265,8 +268,6 @@ module Message =
             | PortType          -> readPort reader
             | messageType       ->
                 failwith $"Cannot convert MessageType %A{messageType} to byte"
-    and private readFailure () =
-        failwith "Received negative value for message length"
     and private readKeepAlive () =
         KeepAliveMessage
     and private readChoke () =
