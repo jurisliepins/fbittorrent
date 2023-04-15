@@ -7,45 +7,6 @@ open System.Collections.Generic
 open System.IO
 open System.Linq
 
-type SomethingStream() =
-    inherit Stream()
-
-    let mutable bytes = ArrayPool<byte>.Shared.Rent(16384)
-
-    let mutable readerPos = 0
-    let mutable writerPos = 0
-    
-    override this.Read(buffer, offset, count) =
-        Array.Copy(bytes, readerPos, buffer, offset, count)
-        readerPos <- readerPos + count
-        // if writerPos = bytes.Length && readerPos = writerPos then
-            // let newBytes = ArrayPool<byte>.Shared.Rent(bytes.Length - readerPos)
-            // Array.Copy(bytes, readerPos, newBytes, 0, bytes.Length - readerPos)
-            // writerPos <- (writerPos - readerPos)
-            // readerPos <- 0
-            // ArrayPool<byte>.Shared.Return(bytes)
-            // bytes <- newBytes
-        readerPos
-    
-    override this.Write(buffer, offset, count) =
-        if (writerPos + count) > bytes.Length then
-            let newBytes = ArrayPool<byte>.Shared.Rent(bytes.Length * 2)
-            Array.Copy(bytes, 0, newBytes, 0, writerPos)
-            ArrayPool<byte>.Shared.Return(bytes)
-            bytes <- newBytes
-        Array.Copy(buffer, offset, bytes, writerPos, count)
-        writerPos <- writerPos + count
-    
-    override this.Flush() = failwith "todo"
-    override this.Seek(offset, origin) = failwith "todo"
-    override this.SetLength(value) = failwith "todo"
-    override this.CanRead = failwith "todo"
-    override this.CanSeek = failwith "todo"
-    override this.CanWrite = failwith "todo"
-    override this.Length = writerPos
-    override this.Position = readerPos
-    override this.Position with set value = failwith "todo" 
-
 type ByteBuffer =
     val private bytes: byte[]
     val private length: int
@@ -165,3 +126,31 @@ and CircularBufferEnumerator<'a>(buffer: CircularBuffer<'a>) =
                 false
                 
         member _.Reset() = index <- 0
+        
+        
+type SomethingStream() =
+    inherit Stream()
+    
+    let queue = Queue<byte>(16484)
+    
+    override __.Read(buffer, offset, count) =
+        // if readerPos + count > writerPos then failwith "Read overflow!" 
+        for i in 0..count - 1 do
+            buffer[offset + i] <- queue.Dequeue()
+        count
+    
+    override __.Write(buffer, offset, count) =
+        // if length + count > 16484 then failwith "Write overflow!"
+        for i in 0..count - 1 do
+            queue.Enqueue(buffer[offset + i])
+    
+    override _.Length = int64 (queue.Count)
+
+//----------------------------------------------------------------------------------------------------------------------    
+    override this.Flush() = failwith "todo"
+    override this.Seek(offset, origin) = failwith "todo"
+    override this.SetLength(value) = failwith "todo"
+    override this.CanRead = failwith "todo"
+    override this.CanSeek = failwith "todo"
+    override this.CanWrite = failwith "todo"
+    override this.Position with get() = failwith "todo" and set value = failwith "todo" 

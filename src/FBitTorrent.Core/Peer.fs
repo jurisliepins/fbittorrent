@@ -157,11 +157,6 @@ module Peer =
             let port = reader.ReadInt16()
             PortMessage port
         
-        let handshakeHeaderAvailable (stream: Stream)                = (stream.Length - stream.Position) >= sizeof<byte>
-        let handshakeBodyAvailable   (stream: Stream) (length: byte) = (stream.Length - stream.Position) >= int64 (length + 8uy + 20uy + 20uy)
-        let messageHeaderAvailable   (stream: Stream)                = (stream.Length - stream.Position) >= sizeof<int32>
-        let messageBodyAvailable     (stream: Stream) (length: int)  = (stream.Length - stream.Position) >= int64 length
-        
         let actorName () = "stream"
         
         let actorBody notifiedRef connectionRef (initialState: State) (mailbox: Actor<obj>) =
@@ -185,15 +180,31 @@ module Peer =
                 | ReadCurrent ->
                     try
                         match state with
-                        | { Status = AwaitingHandshakeHeader }      when handshakeHeaderAvailable state.Pipe        -> handleHandshakeHeader state
-                        | { Status = AwaitingHandshakeBody length } when handshakeBodyAvailable   state.Pipe length -> handleHandshakeBody   state length
-                        | { Status = AwaitingMessageHeader }        when messageHeaderAvailable   state.Pipe        -> handleMessageHeader   state
-                        | { Status = AwaitingMessageBody length }   when messageBodyAvailable     state.Pipe length -> handleMessageBody     state length
+                        | { Status = AwaitingHandshakeHeader } when handshakeHeaderAvailable state.Pipe ->
+                            handleHandshakeHeader state
+                        | { Status = AwaitingHandshakeBody length } when handshakeBodyAvailable state.Pipe length ->
+                            handleHandshakeBody state length
+                        | { Status = AwaitingMessageHeader } when messageHeaderAvailable state.Pipe ->
+                            handleMessageHeader state
+                        | { Status = AwaitingMessageBody length } when messageBodyAvailable state.Pipe length ->
+                            handleMessageBody state length
                         | _ ->
                             receive state
                     with exn ->
                         notifiedRef <! Failed (Exception("Failed to read bytes", exn))
                         receive state
+            
+            and handshakeHeaderAvailable (stream: Stream) =
+                stream.Length >= sizeof<byte>
+            
+            and handshakeBodyAvailable (stream: Stream) (length: byte) =
+                stream.Length >= int64 (length + 8uy + 20uy + 20uy)
+            
+            and messageHeaderAvailable (stream: Stream) =
+                stream.Length >= sizeof<int32>
+            
+            and messageBodyAvailable (stream: Stream) (length: int) =
+                stream.Length >= int64 length
                         
             and handleHandshakeHeader (state: State) =
                 let reader = new BigEndianReader(state.Pipe)
@@ -214,8 +225,8 @@ module Peer =
                 let reader = new BigEndianReader(state.Pipe)
                 let length = reader.ReadInt32()
                 logInfo mailbox $"Read message header %d{length}"
-                if length < 0 then
-                    failwith "Received negative value for message length"
+                if length < 0     then failwith "Received negative value for message length"
+                if length > 16484 then failwith $"Not accepting messages longer than %d{16484} bytes"
                 if length = 0 then
                     notifiedRef <! ReceivedMessage KeepAliveMessage
                     mailbox.Self <! ReadCurrent
