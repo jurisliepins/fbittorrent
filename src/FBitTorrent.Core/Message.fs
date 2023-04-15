@@ -109,19 +109,21 @@ module Message =
     
     let [<Literal>] DefaultReadTimeoutMillis = 120_000
     
+    let [<Literal>] MessageLengthLimit = 16394
+    
     let rec write (writer: BigEndianWriter) (message: Message) =
         match message with
-        | KeepAliveMessage                   -> writeKeepAlive writer
-        | ChokeMessage                       -> writeChoke writer 
-        | UnChokeMessage                     -> writeUnChoke writer
-        | InterestedMessage                  -> writeInterested writer
+        | KeepAliveMessage                   -> writeKeepAlive     writer
+        | ChokeMessage                       -> writeChoke         writer 
+        | UnChokeMessage                     -> writeUnChoke       writer
+        | InterestedMessage                  -> writeInterested    writer
         | NotInterestedMessage               -> writeNotInterested writer
-        | HaveMessage     idx                -> writeHave writer idx
-        | BitfieldMessage bitfield           -> writeBitfield writer bitfield
-        | RequestMessage  (idx, beg, length) -> writeRequest writer idx beg length
-        | PieceMessage    (idx, beg, block)  -> writePiece writer idx beg block
-        | CancelMessage   (idx, beg, length) -> writeCancel writer idx beg length
-        | PortMessage     port               -> writePort writer port
+        | HaveMessage     idx                -> writeHave          writer idx
+        | BitfieldMessage bitfield           -> writeBitfield      writer bitfield
+        | RequestMessage  (idx, beg, length) -> writeRequest       writer idx beg length
+        | PieceMessage    (idx, beg, block)  -> writePiece         writer idx beg block
+        | CancelMessage   (idx, beg, length) -> writeCancel        writer idx beg length
+        | PortMessage     port               -> writePort          writer port
     and private writeKeepAlive writer =
         writer.Write(0)
         writer.Flush()
@@ -180,17 +182,17 @@ module Message =
     
     let rec asyncWrite (writer: BigEndianWriter) (message: Message) = async {
         match message with
-        | KeepAliveMessage                   -> return! asyncWriteKeepAlive writer
-        | ChokeMessage                       -> return! asyncWriteChoke writer 
-        | UnChokeMessage                     -> return! asyncWriteUnChoke writer
-        | InterestedMessage                  -> return! asyncWriteInterested writer
+        | KeepAliveMessage                   -> return! asyncWriteKeepAlive     writer
+        | ChokeMessage                       -> return! asyncWriteChoke         writer 
+        | UnChokeMessage                     -> return! asyncWriteUnChoke       writer
+        | InterestedMessage                  -> return! asyncWriteInterested    writer
         | NotInterestedMessage               -> return! asyncWriteNotInterested writer
-        | HaveMessage     idx                -> return! asyncWriteHave writer idx
-        | BitfieldMessage bitfield           -> return! asyncWriteBitfield writer bitfield
-        | RequestMessage  (idx, beg, length) -> return! asyncWriteRequest writer idx beg length
-        | PieceMessage    (idx, beg, block)  -> return! asyncWritePiece writer idx beg block
-        | CancelMessage   (idx, beg, length) -> return! asyncWriteCancel writer idx beg length
-        | PortMessage     port               -> return! asyncWritePort writer port }
+        | HaveMessage     idx                -> return! asyncWriteHave          writer idx
+        | BitfieldMessage bitfield           -> return! asyncWriteBitfield      writer bitfield
+        | RequestMessage  (idx, beg, length) -> return! asyncWriteRequest       writer idx beg length
+        | PieceMessage    (idx, beg, block)  -> return! asyncWritePiece         writer idx beg block
+        | CancelMessage   (idx, beg, length) -> return! asyncWriteCancel        writer idx beg length
+        | PortMessage     port               -> return! asyncWritePort          writer port }
     and private asyncWriteKeepAlive writer = async {
         do! writer.AsyncWrite(0)
         do! writer.AsyncFlush() }
@@ -249,24 +251,23 @@ module Message =
     
     let rec read (reader: BigEndianReader) =
         match reader.ReadInt32() with
-        | length when length < 0 -> readFailure ()
+        | length when length < 0 -> failwith "Received negative value for message length"
+        | length when length > MessageLengthLimit -> failwith $"Not accepting messages longer than %d{MessageLengthLimit} bytes"
         | length when length = 0 -> readKeepAlive ()
         | length ->
             match MessageType.FromByte(reader.ReadByte()) with
-            | ChokeType         -> readChoke ()
-            | UnChokeType       -> readUnChoke ()
-            | InterestedType    -> readInterested ()
+            | ChokeType         -> readChoke         ()
+            | UnChokeType       -> readUnChoke       ()
+            | InterestedType    -> readInterested    ()
             | NotInterestedType -> readNotInterested ()
-            | HaveType          -> readHave reader 
-            | BitfieldType      -> readBitfield reader length
-            | RequestType       -> readRequest reader 
-            | PieceType         -> readPiece reader length
-            | CancelType        -> readCancel reader 
-            | PortType          -> readPort reader
+            | HaveType          -> readHave          reader 
+            | BitfieldType      -> readBitfield      reader length
+            | RequestType       -> readRequest       reader 
+            | PieceType         -> readPiece         reader length
+            | CancelType        -> readCancel        reader 
+            | PortType          -> readPort          reader
             | messageType       ->
-                failwith $"Cannot convert MessageType %A{messageType} to byte"
-    and private readFailure () =
-        failwith "Received negative value for message length"
+                failwith $"Unhandled Message %A{messageType}"
     and private readKeepAlive () =
         KeepAliveMessage
     and private readChoke () =
@@ -308,18 +309,18 @@ module Message =
         | length when length = 0 -> return! asyncReadKeepAlive ()
         | length ->
             match MessageType.FromByte(reader.ReadByte()) with
-            | ChokeType         -> return! asyncReadChoke ()
-            | UnChokeType       -> return! asyncReadUnChoke ()
-            | InterestedType    -> return! asyncReadInterested ()
+            | ChokeType         -> return! asyncReadChoke         ()
+            | UnChokeType       -> return! asyncReadUnChoke       ()
+            | InterestedType    -> return! asyncReadInterested    ()
             | NotInterestedType -> return! asyncReadNotInterested ()
-            | HaveType          -> return! asyncReadHave reader 
-            | BitfieldType      -> return! asyncReadBitfield reader length
-            | RequestType       -> return! asyncReadRequest reader 
-            | PieceType         -> return! asyncReadPiece reader length
-            | CancelType        -> return! asyncReadCancel reader 
-            | PortType          -> return! asyncReadPort reader
+            | HaveType          -> return! asyncReadHave          reader 
+            | BitfieldType      -> return! asyncReadBitfield      reader length
+            | RequestType       -> return! asyncReadRequest       reader 
+            | PieceType         -> return! asyncReadPiece         reader length
+            | CancelType        -> return! asyncReadCancel        reader 
+            | PortType          -> return! asyncReadPort          reader
             | messageType       ->
-                return failwith $"Cannot convert MessageType %A{messageType} to byte" }
+                return failwith $"Unhandled Message %A{messageType}" }
     and private asyncReadFailure () = async {
         return failwith "Received negative value for message length" }
     and private asyncReadKeepAlive () = async {

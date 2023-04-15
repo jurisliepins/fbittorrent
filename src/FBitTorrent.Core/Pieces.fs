@@ -128,6 +128,7 @@ module Pieces =
     
     type Notification =
         | PieceReceived of Id: int * Data: ByteBuffer
+        | PieceFailed   of Id: int * Data: ByteBuffer * Error: Exception
         
     let actorName () = "pieces"
     
@@ -167,10 +168,7 @@ module Pieces =
                             state.RunningPieces |> Bitfield.setBit idx false
                         else
                             logDebug mailbox $"Leeched piece %d{idx} hash is invalid"
-                            try
-                                data.Release()
-                            with exn ->
-                                logError mailbox $"Failed to release piece %d{idx} %A{exn}"
+                            notifiedRef <! PieceFailed (idx, data, Exception($"Leeched piece %d{idx} hash is invalid"))
                     else
                         // Piece is currently not running means that multiple peers were leeching and one already successfully completed.
                         logDebug mailbox $"Leeched piece %d{idx} %A{data} but we already have it"

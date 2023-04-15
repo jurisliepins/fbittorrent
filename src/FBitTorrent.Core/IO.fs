@@ -41,8 +41,8 @@ module IO =
         | WritePiece of Id: int * Data: ByteBuffer
     
     type CommandResult =
-        | PieceWriteSuccess of Id: int
-        | PieceWriteFailure of Id: int * Error: Exception
+        | PieceWriteSuccess of Id: int * Data: ByteBuffer
+        | PieceWriteFailure of Id: int * Data: ByteBuffer * Error: Exception
     
     let private createDirs (fs: IFileSystem) (rootDirPath: string) (dirPaths: string list) =
         if fs.DirectoryExists(rootDirPath) then
@@ -98,33 +98,25 @@ module IO =
         
         and handleCommand (state: State) command =
             match command with
-            | WritePiece (idx, piece) ->
+            | WritePiece (idx, data) ->
                 match state with
                 | { Status = Initialised } ->
                     try
-                        writePiece fs state.RootDirPath state.Pieces[idx] piece
-                        mailbox.Context.Sender <! PieceWriteSuccess idx
+                        writePiece fs state.RootDirPath state.Pieces[idx] data
+                        mailbox.Context.Sender <! PieceWriteSuccess (idx, data)
                     with exn ->
-                        mailbox.Context.Sender <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", exn))
-                    try
-                        piece.Release()
-                    with exn ->
-                        logError mailbox $"Failed to release piece %d{idx} %A{exn}"
+                        mailbox.Context.Sender <! PieceWriteFailure (idx, data, Exception($"Failed to write piece %d{idx}", exn))
                     receive state
                 | { Status = Uninitialised } ->
                     try
                         createDirs fs state.RootDirPath state.DirPaths
                         try
-                            writePiece fs state.RootDirPath state.Pieces[idx] piece
-                            mailbox.Context.Sender <! PieceWriteSuccess idx
+                            writePiece fs state.RootDirPath state.Pieces[idx] data
+                            mailbox.Context.Sender <! PieceWriteSuccess (idx, data)
                         with exn ->
-                            mailbox.Context.Sender <! PieceWriteFailure (idx, Exception($"Failed to write piece %d{idx}", exn))
+                            mailbox.Context.Sender <! PieceWriteFailure (idx, data, Exception($"Failed to write piece %d{idx}", exn))
                     with exn ->
-                        mailbox.Context.Sender <! PieceWriteFailure (idx, Exception("Failed to create directories", exn))
-                    try
-                        piece.Release()
-                    with exn ->
-                        logError mailbox $"Failed to release piece %d{idx} %A{exn}"
+                        mailbox.Context.Sender <! PieceWriteFailure (idx, data, Exception("Failed to create directories", exn))
                     receive { state with Status = Initialised }
 
         and unhandled (state: State) message =

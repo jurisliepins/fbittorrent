@@ -12,7 +12,7 @@ module Program =
     let private runClient () =
         let config =
             """
-            akka { loglevel = off }
+            akka { loglevel = error }
             """
             |> ConfigurationFactory.ParseString
         let system = ActorSystem.create "fbittorrent-system" config

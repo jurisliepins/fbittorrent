@@ -11,7 +11,6 @@ nuget Microsoft.NET.Test.Sdk 16.11.0
 nuget Akka.FSharp 1.4.35
 nuget Akka.TestKit 1.4.35
 nuget Akka.TestKit.Xunit2 1.4.35
-nuget Argu 6.1.1
 
 group Build
     source https://api.nuget.org/v3/index.json

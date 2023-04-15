@@ -240,7 +240,7 @@ module Torrent =
         
         and handleIOCommandResult downMeter upMeter (state: State) result =
             match result with
-            | IO.PieceWriteSuccess idx ->
+            | IO.PieceWriteSuccess (idx, data) ->
                 logDebug mailbox $"Wrote piece %d{idx}"
                 for ref in mailbox.Context.GetPeers() do
                     ref <! Peer.PieceLeeched idx
@@ -255,10 +255,18 @@ module Torrent =
                     announcerRef <! Announcer.Announce (createCompletedAnnounceArgs state)
                 else
                     logInfo mailbox $"%d{nextState.Bitfield.Capacity - nextState.Bitfield.Count} pieces left to leech"
+                try
+                    data.Release()
+                with exn ->
+                    logError mailbox $"Failed to release piece %d{idx} %A{exn}"
                 receive downMeter upMeter nextState 
-            | IO.PieceWriteFailure (idx, error) ->
+            | IO.PieceWriteFailure (idx, data, error) ->
                 logError mailbox $"Failed to write piece %d{idx} %A{error}"
                 notifiedRef <! StatusChanged Errored
+                try
+                    data.Release()
+                with exn ->
+                    logError mailbox $"Failed to release piece %d{idx} %A{exn}"
                 receive downMeter upMeter { state with Status = Errored }
         
         and handleConnectorCommandResult downMeter upMeter (state: State) result =
@@ -287,13 +295,20 @@ module Torrent =
         
         and handlePiecesNotification downMeter upMeter (state: State) notification =
             match notification with
-            | Pieces.PieceReceived (idx, piece) ->
+            | Pieces.PieceReceived (idx, data) ->
                 logDebug mailbox $"Leeched piece %d{idx}"
-                ioRef <! IO.WritePiece (idx, piece)
+                ioRef <! IO.WritePiece (idx, data)
                 let nextState =
                     { state with Downloaded = state.Downloaded + int64 state.Pieces[idx].Length }
                 notifiedRef <! BytesChanged (nextState.Downloaded, nextState.Uploaded, nextState.Left)
                 receive downMeter upMeter nextState
+            | Pieces.PieceFailed (idx, data, error) ->
+                logError mailbox $"Leeching piece %d{idx} failed %A{error}"
+                try
+                    data.Release()
+                with exn ->
+                    logError mailbox $"Failed to release piece %d{idx} %A{exn}"
+                receive downMeter upMeter state
                 
         and handlePeerNotification downMeter upMeter (state: State) notification =
             match notification with
