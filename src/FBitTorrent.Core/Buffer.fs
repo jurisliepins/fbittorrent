@@ -7,6 +7,42 @@ open System.Collections.Generic
 open System.IO
 open System.Linq
 
+type SomethingStream() =
+    inherit Stream()
+
+    let mutable bytes = ArrayPool<byte>.Shared.Rent(512)
+
+    let mutable readerPos = 0
+    let mutable writerPos = 0
+    
+    override this.Read(buffer, offset, count) =
+        Array.Copy(bytes, readerPos, buffer, offset, count)
+        readerPos <- readerPos + count
+        // if readerPos >= bytes.Length then
+        //     let newBytes = ArrayPool<byte>.Shared.Rent(bytes.Length / 2)
+        //     Array.Copy(bytes, readerPos, newBytes, 0, bytes.Length - readerPos)
+        //     readerPos <- 0
+        readerPos
+    
+    override this.Write(buffer, offset, count) =
+        if (writerPos + count) > bytes.Length then
+            let newBytes = ArrayPool<byte>.Shared.Rent(bytes.Length * 2)
+            Array.Copy(bytes, newBytes, bytes.Length)
+            ArrayPool<byte>.Shared.Return(bytes)
+            bytes <- newBytes
+        Array.Copy(buffer, offset, bytes, writerPos, count)
+        writerPos <- writerPos + count
+    
+    override this.Flush() = failwith "todo"
+    override this.Seek(offset, origin) = failwith "todo"
+    override this.SetLength(value) = failwith "todo"
+    override this.CanRead = failwith "todo"
+    override this.CanSeek = failwith "todo"
+    override this.CanWrite = failwith "todo"
+    override this.Length = writerPos
+    override this.Position = readerPos
+    override this.Position with set value = failwith "todo" 
+
 type ByteBuffer =
     val private bytes: byte[]
     val private length: int

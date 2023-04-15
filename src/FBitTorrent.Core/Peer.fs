@@ -2,6 +2,7 @@ namespace FBitTorrent.Core
 
 open System
 open System.Collections.Generic
+open System.IO
 open System.Net
 open System.Linq
 open System.Text
@@ -13,14 +14,21 @@ open FBitTorrent.Core
 module Peer =
     module Stream =
         type Status =
-            | ReadingHandshake
-            | ReadingMessages
+            | AwaitingHandshakeHeader
+            | AwaitingHandshakeBody of Length: byte
+            | AwaitingMessageHeader
+            | AwaitingMessageBody   of Length: int
         
         type State =
-            { Status: Status }
+            { Status:  Status
+              Pipe:    SomethingStream }
         
         let createState () =
-            { Status = ReadingHandshake }
+            { Status  = AwaitingHandshakeHeader
+              Pipe    = SomethingStream() }
+        
+        type private Action =
+            | PipeRead
         
         type Command =
             | WriteHandshake of Handshake: Handshake
@@ -97,12 +105,68 @@ module Peer =
             connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (PortType.ToByte()) |]))
             connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt16 port))
         
+        let readHandshake (reader: BigEndianReader) (length: byte) =
+            let proto = reader.ReadBytes(int length)
+            let res = reader.ReadBytes(8)
+            let ih = reader.ReadBytes(20)
+            let pid = reader.ReadBytes(20)
+            Handshake (proto, res, ih, pid)
+        
+        let rec readMessage (reader: BigEndianReader) (length: int) =
+            match MessageType.FromByte(reader.ReadByte()) with
+            | ChokeType         -> readChoke         ()
+            | UnChokeType       -> readUnChoke       ()
+            | InterestedType    -> readInterested    ()
+            | NotInterestedType -> readNotInterested ()
+            | HaveType          -> readHave          reader 
+            | BitfieldType      -> readBitfield      reader length
+            | RequestType       -> readRequest       reader 
+            | PieceType         -> readPiece         reader length
+            | CancelType        -> readCancel        reader 
+            | PortType          -> readPort          reader
+            | messageType       -> failwith $"Unhandled MessageType %A{messageType}"
+        and private readChoke () =
+            ChokeMessage
+        and private readUnChoke () =
+            UnChokeMessage
+        and private readInterested () =
+            InterestedMessage
+        and private readNotInterested () =
+            NotInterestedMessage
+        and private readHave reader =
+            let idx = reader.ReadInt32()
+            HaveMessage idx
+        and private readBitfield reader length =
+            let bitfield = reader.ReadBytes(length - 1)
+            BitfieldMessage bitfield
+        and private readRequest reader =
+            let idx = reader.ReadInt32()
+            let beg = reader.ReadInt32()
+            let length = reader.ReadInt32()
+            RequestMessage (idx, beg, length)
+        and private readPiece reader length =
+            let idx = reader.ReadInt32()
+            let beg = reader.ReadInt32()
+            let block = reader.ReadByteBuffer(length - 1 - 8);
+            PieceMessage (idx, beg, block)
+        and private readCancel reader =
+            let idx = reader.ReadInt32()
+            let beg = reader.ReadInt32()
+            let length = reader.ReadInt32()
+            CancelMessage (idx, beg, length)
+        and private readPort reader =
+            let port = reader.ReadInt16()
+            PortMessage port
+        
         let actorName () = "stream"
         
         let actorBody notifiedRef connectionRef (initialState: State) (mailbox: Actor<obj>) =
-            mailbox.Defer(fun () -> connectionRef <! Tcp.Close.Instance)
+            mailbox.Defer(fun _ -> connectionRef <! Tcp.Close.Instance)
             let rec receive (state: State) = actor {
                 match! mailbox.Receive() with
+                | :? Action as action ->
+                    return! handleAction state action
+                
                 | :? Command as command ->
                     return! handleCommand state command
                 
@@ -111,6 +175,50 @@ module Peer =
                     
                 | message ->
                     return! unhandled state message }
+            
+            and handleAction (state: State) action =
+                match action with
+                | PipeRead ->
+                    try
+                        match state with
+                        | { Status = AwaitingHandshakeHeader } when (state.Pipe.Length - state.Pipe.Position) >= sizeof<byte> ->
+                            let reader = new BigEndianReader(state.Pipe)
+                            let length = reader.ReadByte()
+                            logInfo mailbox $"Read handshake header %d{length}"
+                            mailbox.Self <! PipeRead
+                            receive { state with Status = AwaitingHandshakeBody length }
+                        | { Status = AwaitingHandshakeBody length } when (state.Pipe.Length - state.Pipe.Position) >= int64 (length + 8uy + 20uy + 20uy) ->
+                            let reader = new BigEndianReader(state.Pipe)
+                            let handshake = readHandshake reader length
+                            logInfo mailbox "Read handshake"
+                            notifiedRef <! ReceivedHandshake handshake
+                            mailbox.Self <! PipeRead
+                            receive { state with Status = AwaitingMessageHeader }
+                        | { Status = AwaitingMessageHeader } when (state.Pipe.Length - state.Pipe.Position) >= sizeof<int32> ->
+                            let reader = new BigEndianReader(state.Pipe)
+                            let length = reader.ReadInt32()
+                            logInfo mailbox $"Read message header %d{length}"
+                            if length < 0 then
+                                failwith "Received negative value for message length"
+                            elif length = 0 then
+                                notifiedRef <! ReceivedMessage KeepAliveMessage
+                                mailbox.Self <! PipeRead
+                                receive { state with Status = AwaitingMessageHeader }
+                            else 
+                                mailbox.Self <! PipeRead
+                                receive { state with Status = AwaitingMessageBody length }
+                        | { Status = AwaitingMessageBody length } when (state.Pipe.Length - state.Pipe.Position) >= int64 length ->
+                            let reader = new BigEndianReader(state.Pipe)
+                            let message = readMessage reader length
+                            logInfo mailbox "Read message"
+                            notifiedRef <! ReceivedMessage message
+                            mailbox.Self <! PipeRead
+                            receive { state with Status = AwaitingMessageHeader }
+                        | _ ->
+                            receive state
+                    with exn ->
+                        notifiedRef <! Failed (Exception("Failed to read bytes", exn))
+                        receive state
             
             and handleCommand (state: State) command =
                 match command with
@@ -129,12 +237,12 @@ module Peer =
             and handleTcpEvent (state: State) event =
                 match event with
                 | :? Tcp.Received as received ->
-                    logInfo mailbox "Received"
-                    match state with
-                    | { Status = ReadingHandshake } ->
-                        receive state
-                    | { Status = ReadingMessages } ->
-                        receive state
+                    try
+                        received.Data.WriteTo(state.Pipe)
+                        mailbox.Self <! PipeRead
+                    with exn ->
+                        notifiedRef <! Failed (Exception("Failed to receive bytes", exn))
+                    receive state
                 | :? Tcp.ConnectionClosed as closed ->
                     notifiedRef <! Failed (Exception($"Connection closed %s{closed.Cause}"))
                     receive state

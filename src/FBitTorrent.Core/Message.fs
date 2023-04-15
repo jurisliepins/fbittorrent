@@ -264,7 +264,7 @@ module Message =
             | CancelType        -> readCancel reader 
             | PortType          -> readPort reader
             | messageType       ->
-                failwith $"Cannot convert MessageType %A{messageType} to byte"
+                failwith $"Unhandled MessageType %A{messageType}"
     and private readFailure () =
         failwith "Received negative value for message length"
     and private readKeepAlive () =
