@@ -5,98 +5,158 @@ open System.Collections.Generic
 open System.Net
 open System.Linq
 open System.Text
+open Akka.IO
 open Akka.FSharp
 open Akka.Actor
 open FBitTorrent.Core
 
 module Peer =
     module Stream =
+        type Status =
+            | ReadingHandshake
+            | ReadingMessages
+        
         type State =
-            { Placeholder: unit }
+            { Status: Status }
         
         let createState () =
-            { Placeholder = () }
-        
-        type private Action =
-            | ReadHandshake
-            | ReadMessage
+            { Status = ReadingHandshake }
         
         type Command =
             | WriteHandshake of Handshake: Handshake
             | WriteMessage   of Message: Message
-        
-        type CommandResult =
-            | WriteFailure of Error: Exception
         
         type Notification =
             | ReceivedHandshake of Handshake: Handshake
             | ReceivedMessage   of Message: Message
             | Failed            of Error: Exception
         
+        let writeHandshake (connectionRef: IActorRef) (Handshake (proto, res, ih, pid): Handshake) =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| proto.Length |> byte |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(proto))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(res))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(ih))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(pid))
+        
+        let rec writeMessage (connectionRef: IActorRef) (message: Message) =
+            match message with
+            | KeepAliveMessage                   -> writeKeepAlive     connectionRef
+            | ChokeMessage                       -> writeChoke         connectionRef 
+            | UnChokeMessage                     -> writeUnChoke       connectionRef
+            | InterestedMessage                  -> writeInterested    connectionRef
+            | NotInterestedMessage               -> writeNotInterested connectionRef
+            | HaveMessage     idx                -> writeHave          connectionRef idx
+            | BitfieldMessage bitfield           -> writeBitfield      connectionRef bitfield
+            | RequestMessage  (idx, beg, length) -> writeRequest       connectionRef idx beg length
+            | PieceMessage    (idx, beg, block)  -> writePiece         connectionRef idx beg block
+            | CancelMessage   (idx, beg, length) -> writeCancel        connectionRef idx beg length
+            | PortMessage     port               -> writePort          connectionRef port
+        and private writeKeepAlive connectionRef =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 0))
+        and private writeChoke connectionRef =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 1))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (ChokeType.ToByte()) |]))
+        and private writeUnChoke connectionRef =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 1))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (UnChokeType.ToByte()) |]))
+        and private writeInterested connectionRef =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 1))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (InterestedType.ToByte()) |]))
+        and private writeNotInterested connectionRef =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 1))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (NotInterestedType.ToByte()) |]))
+        and private writeHave connectionRef (idx: int) =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 5))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (HaveType.ToByte()) |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 idx))
+        and private writeBitfield connectionRef (bitfield: byte[]) =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (1 + bitfield.Length)))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (BitfieldType.ToByte()) |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(bitfield))
+        and private writeRequest connectionRef (idx: int) (beg: int) (length: int) =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (1 + 12)))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (RequestType.ToByte()) |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 idx))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 beg))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 length))
+        and private writePiece connectionRef (idx: int) (beg: int) (block: ByteBuffer) =
+            failwith "Writing piece is not supported"
+            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (9 + block.Length)))
+            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (PieceType.ToByte()) |]))
+            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 idx))
+            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 beg))
+            // connectionRef <! Tcp.Write.Create(ByteString.FromBytes(block.ToArray()))
+        and private writeCancel connectionRef (idx: int) (beg: int) (length: int) =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 (1 + 12)))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (CancelType.ToByte()) |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 idx))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 beg))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 length))
+        and private writePort connectionRef (port: int16) =
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt32 3))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes([| (PortType.ToByte()) |]))
+            connectionRef <! Tcp.Write.Create(ByteString.FromBytes(BigEndianConverter.fromInt16 port))
+        
         let actorName () = "stream"
         
-        let actorBody notifiedRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
-            mailbox.Defer(connection.Dispose)
+        let actorBody notifiedRef connectionRef (initialState: State) (mailbox: Actor<obj>) =
+            mailbox.Defer(fun () -> connectionRef <! Tcp.Close.Instance)
             let rec receive (state: State) = actor {
                 match! mailbox.Receive() with
-                | :? Action as action ->
-                    return! handleAction state action
-                
                 | :? Command as command ->
                     return! handleCommand state command
+                
+                | :? Tcp.Event as event ->
+                    return! handleTcpEvent state event
                     
                 | message ->
                     return! unhandled state message }
-            
-            and handleAction (state: State) action = 
-                match action with
-                | ReadHandshake -> 
-                    Async.StartAsTask(async {
-                        try
-                            let! handshake = Handshake.asyncRead connection.Reader
-                            mailbox.Self <! ReadMessage
-                            return ReceivedHandshake handshake
-                        with exn ->
-                            return Failed (Exception("Failed to read handshake", exn))
-                    }).PipeTo(notifiedRef) |> ignore
-                | ReadMessage -> 
-                    Async.StartAsTask(async {
-                        try
-                            let! message = Message.asyncRead connection.Reader
-                            mailbox.Self <! ReadMessage
-                            return ReceivedMessage message
-                        with exn ->
-                            return Failed (Exception("Failed to read message", exn))
-                    }).PipeTo(notifiedRef) |> ignore
-                receive state
             
             and handleCommand (state: State) command =
                 match command with
                 | WriteHandshake handshake ->
                     try
-                        Handshake.write connection.Writer handshake
+                        writeHandshake connectionRef handshake
                     with exn ->
-                        mailbox.Context.Sender <! WriteFailure (Exception("Failed to write handshake", exn))
+                        notifiedRef <! Failed (Exception("Failed to write handshake", exn))
                 | WriteMessage message ->
                     try
-                        Message.write connection.Writer message
+                        writeMessage connectionRef message
                     with exn ->
-                        mailbox.Context.Sender <! WriteFailure (Exception("Failed to write message", exn))
+                        notifiedRef <! Failed (Exception("Failed to write message", exn))
                 receive state
+            
+            and handleTcpEvent (state: State) event =
+                match event with
+                | :? Tcp.Received as received ->
+                    logInfo mailbox "Received"
+                    match state with
+                    | { Status = ReadingHandshake } ->
+                        receive state
+                    | { Status = ReadingMessages } ->
+                        receive state
+                | :? Tcp.ConnectionClosed as closed ->
+                    notifiedRef <! Failed (Exception($"Connection closed %s{closed.Cause}"))
+                    receive state
+                | :? Tcp.CommandFailed as failed ->
+                    notifiedRef <! Failed (Exception($"Command failed %s{failed.CauseString}"))
+                    receive state
+                | message ->
+                    unhandled state message
                 
             and unhandled (state: State) message =
                 mailbox.Unhandled(message)
                 receive state 
             
-            mailbox.Self <! ReadHandshake
+            connectionRef <! Tcp.Register mailbox.Self
             
             receive initialState
             
-        let defaultActorBody notifiedRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
-            actorBody notifiedRef connection initialState mailbox
+        let defaultActorBody notifiedRef connectionRef (initialState: State) (mailbox: Actor<obj>) =
+            actorBody notifiedRef connectionRef initialState mailbox
             
-        let spawn (actorFactory: IActorRefFactory) notifiedRef connection (initialState: State) =
-            spawn actorFactory (actorName ()) (defaultActorBody notifiedRef connection initialState)
+        let spawn (actorFactory: IActorRefFactory) notifiedRef connectionRef (initialState: State) =
+            spawn actorFactory (actorName ()) (defaultActorBody notifiedRef connectionRef initialState)
     
     module StreamExtensions =
         type IActorContext with
@@ -161,11 +221,15 @@ module Peer =
         | RateChanged     of Down: Rate * Up: Rate
         | Failed          of Error: Exception
     
-    let actorName (endpoint: IPEndPoint) = $"peer-%A{endpoint.Address}:%d{endpoint.Port}"
+    let actorName (endpoint: EndPoint) =
+        let str = endpoint.ToString()
+                      .Replace("[", "")
+                      .Replace("]", "")
+        $"peer-%s{str}"
     
-    let actorBody notifiedRef piecesRef (connection: IConnection) (initialState: State) (mailbox: Actor<obj>) =
+    let actorBody notifiedRef piecesRef connectionRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}" 
-        let streamRef = Stream.spawn mailbox mailbox.Self connection (Stream.createState ())
+        let streamRef = Stream.spawn mailbox mailbox.Self connectionRef (Stream.createState ())
         let rec receive pipeline leechOpt (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
             match! mailbox.Receive() with
             | :? Action as action ->
@@ -179,9 +243,6 @@ module Peer =
             
             | :? Pieces.Response as response ->
                 return! handlePiecesResponse pipeline leechOpt downMeter upMeter state response
-            
-            | :? Stream.CommandResult as result ->
-                return! handleStreamCommandResult pipeline leechOpt downMeter upMeter state result
             
             | :? Stream.Notification as notification ->
                 return! handleStreamNotification pipeline leechOpt downMeter upMeter state notification
@@ -265,12 +326,6 @@ module Peer =
                     mailbox.Self <! NextLeech
                     receive pipeline (Some (idx, BlockRequests.create length, BlockResponses.create length)) downMeter upMeter state
 
-        and handleStreamCommandResult pipeline leechOpt downMeter upMeter (state: State) result =
-            match result with
-            | Stream.WriteFailure error ->
-                notifiedRef <! Notification.Failed (Exception("Peer failed to write", error))
-            receive pipeline leechOpt downMeter upMeter state
-        
         and handleStreamNotification pipeline leechOpt downMeter upMeter (state: State) notification =
             match notification with
             | Stream.ReceivedHandshake peerHandshake ->
@@ -368,7 +423,7 @@ module Peer =
                     receive pipeline leechOpt downMeter upMeter state
                     
             | Stream.Failed error ->
-                notifiedRef <! Notification.Failed (Exception("Peer failed to read", error))
+                notifiedRef <! Notification.Failed (Exception("Peer stream failed", error))
                 receive pipeline leechOpt downMeter upMeter state
         
         and unhandled pipeline leechOpt downMeter upMeter (state: State) message =
@@ -377,13 +432,13 @@ module Peer =
         
         receive (BlockPipeline.create ()) None (RateMeter.create ()) (RateMeter.create ()) initialState
             
-    let defaultActorBody notifiedRef piecesRef connection initialState mailbox =
-        actorBody notifiedRef piecesRef connection initialState mailbox
+    let defaultActorBody notifiedRef piecesRef connectionRef initialState mailbox =
+        actorBody notifiedRef piecesRef connectionRef initialState mailbox
         
-    let spawn (actorFactory: IActorRefFactory) notifiedRef piecesRef (connection: IConnection) (initialState: State) =
-        spawn actorFactory (actorName connection.RemoteEndpoint) (defaultActorBody notifiedRef piecesRef connection initialState)
+    let spawn (actorFactory: IActorRefFactory) notifiedRef piecesRef connectionRef localEndpoint remoteEndpoint (initialState: State) =
+        spawn actorFactory (actorName remoteEndpoint) (defaultActorBody notifiedRef piecesRef connectionRef initialState)
 
 module PeerExtensions =
     type IActorContext with
-        member __.GetPeer(endpoint: IPEndPoint) : IActorRef = __.Child(Peer.actorName endpoint)
+        member __.GetPeer(endpoint: EndPoint) : IActorRef = __.Child(Peer.actorName endpoint)
         member __.GetPeers() : IEnumerable<IActorRef> = __.GetChildren().Where(fun ref -> ref.Path.Name.StartsWith("peer"))

@@ -111,17 +111,17 @@ module Message =
     
     let rec write (writer: BigEndianWriter) (message: Message) =
         match message with
-        | KeepAliveMessage                   -> writeKeepAlive writer
-        | ChokeMessage                       -> writeChoke writer 
-        | UnChokeMessage                     -> writeUnChoke writer
-        | InterestedMessage                  -> writeInterested writer
+        | KeepAliveMessage                   -> writeKeepAlive     writer
+        | ChokeMessage                       -> writeChoke         writer 
+        | UnChokeMessage                     -> writeUnChoke       writer
+        | InterestedMessage                  -> writeInterested    writer
         | NotInterestedMessage               -> writeNotInterested writer
-        | HaveMessage     idx                -> writeHave writer idx
-        | BitfieldMessage bitfield           -> writeBitfield writer bitfield
-        | RequestMessage  (idx, beg, length) -> writeRequest writer idx beg length
-        | PieceMessage    (idx, beg, block)  -> writePiece writer idx beg block
-        | CancelMessage   (idx, beg, length) -> writeCancel writer idx beg length
-        | PortMessage     port               -> writePort writer port
+        | HaveMessage     idx                -> writeHave          writer idx
+        | BitfieldMessage bitfield           -> writeBitfield      writer bitfield
+        | RequestMessage  (idx, beg, length) -> writeRequest       writer idx beg length
+        | PieceMessage    (idx, beg, block)  -> writePiece         writer idx beg block
+        | CancelMessage   (idx, beg, length) -> writeCancel        writer idx beg length
+        | PortMessage     port               -> writePort          writer port
     and private writeKeepAlive writer =
         writer.Write(0)
         writer.Flush()
@@ -180,17 +180,17 @@ module Message =
     
     let rec asyncWrite (writer: BigEndianWriter) (message: Message) = async {
         match message with
-        | KeepAliveMessage                   -> return! asyncWriteKeepAlive writer
-        | ChokeMessage                       -> return! asyncWriteChoke writer 
-        | UnChokeMessage                     -> return! asyncWriteUnChoke writer
-        | InterestedMessage                  -> return! asyncWriteInterested writer
+        | KeepAliveMessage                   -> return! asyncWriteKeepAlive     writer
+        | ChokeMessage                       -> return! asyncWriteChoke         writer 
+        | UnChokeMessage                     -> return! asyncWriteUnChoke       writer
+        | InterestedMessage                  -> return! asyncWriteInterested    writer
         | NotInterestedMessage               -> return! asyncWriteNotInterested writer
-        | HaveMessage     idx                -> return! asyncWriteHave writer idx
-        | BitfieldMessage bitfield           -> return! asyncWriteBitfield writer bitfield
-        | RequestMessage  (idx, beg, length) -> return! asyncWriteRequest writer idx beg length
-        | PieceMessage    (idx, beg, block)  -> return! asyncWritePiece writer idx beg block
-        | CancelMessage   (idx, beg, length) -> return! asyncWriteCancel writer idx beg length
-        | PortMessage     port               -> return! asyncWritePort writer port }
+        | HaveMessage     idx                -> return! asyncWriteHave          writer idx
+        | BitfieldMessage bitfield           -> return! asyncWriteBitfield      writer bitfield
+        | RequestMessage  (idx, beg, length) -> return! asyncWriteRequest       writer idx beg length
+        | PieceMessage    (idx, beg, block)  -> return! asyncWritePiece         writer idx beg block
+        | CancelMessage   (idx, beg, length) -> return! asyncWriteCancel        writer idx beg length
+        | PortMessage     port               -> return! asyncWritePort          writer port }
     and private asyncWriteKeepAlive writer = async {
         do! writer.AsyncWrite(0)
         do! writer.AsyncFlush() }

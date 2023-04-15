@@ -6,6 +6,7 @@ open System.Collections.ObjectModel
 open System.IO
 open System.Net
 open System.Linq
+open Akka.IO
 open Akka.Actor
 open Akka.FSharp
 
@@ -116,7 +117,7 @@ module Torrent =
     let actorBody notifiedRef (initialState: State) (mailbox: Actor<obj>) =
         logDebug mailbox $"Initial state \n%A{initialState}"
         let announcerRef = Announcer.spawn mailbox
-        let connectorRef = Connector.spawn mailbox
+        let connectorRef = Connector.spawn mailbox mailbox.Self
         let ioRef = IO.spawn mailbox (IO.createState initialState.Settings.RootDirPath initialState.PieceLength initialState.Pieces initialState.Files) 
         let piecesRef = Pieces.spawn mailbox mailbox.Self (Pieces.createState initialState.Bitfield initialState.Pieces)
         let rec receive (downMeter: RateMeter) (upMeter: RateMeter) (state: State) = actor {
@@ -133,8 +134,8 @@ module Torrent =
             | :? IO.CommandResult as result ->
                 return! handleIOCommandResult downMeter upMeter state result
             
-            | :? Connector.CommandResult as result ->
-                return! handleConnectorCommandResult downMeter upMeter state result
+            | :? Connector.Notification as notification ->
+                return! handleConnectorNotification downMeter upMeter state notification
             
             | :? Pieces.Notification as notification ->
                 return! handlePiecesNotification downMeter upMeter state notification
@@ -261,29 +262,26 @@ module Torrent =
                 notifiedRef <! StatusChanged Errored
                 receive downMeter upMeter { state with Status = Errored }
         
-        and handleConnectorCommandResult downMeter upMeter (state: State) result =
+        and handleConnectorNotification downMeter upMeter (state: State) result =
             match result with
-            | Connector.ConnectSuccess connection ->
+            | Connector.Connected (connectionRef, localEndpoint, remoteEndpoint) ->
                 match state with
                 | { Status = Started } ->
                     if mailbox.Context.GetPeers().Count() < state.Settings.MaxSeedCount then
                         let initialState = (Peer.createState (Handshake.defaultCreate (state.InfoHash.ToArray()) (state.PeerId.ToArray())) (Bitfield.create state.Bitfield.Capacity))
-                        let ref = monitor (Peer.spawn mailbox mailbox.Self piecesRef connection initialState) mailbox
+                        let ref = monitor (Peer.spawn mailbox mailbox.Self piecesRef connectionRef localEndpoint remoteEndpoint initialState) mailbox
                         ref <! Peer.InitiateHandshake
-                        piecesRef <! Pieces.PeerJoined ((Peer.actorName connection.RemoteEndpoint), Bitfield.create state.Bitfield.Capacity)
-                        logInfo mailbox $"Connected to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port}"
+                        piecesRef <! Pieces.PeerJoined (Peer.actorName remoteEndpoint, Bitfield.create state.Bitfield.Capacity)
+                        logInfo mailbox $"Connected to %A{remoteEndpoint}"
                         receive downMeter upMeter state
                     else 
-                        logDebug mailbox $"Not connecting to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port} peer count of %d{state.Settings.MaxSeedCount} exceeded"
-                        connection.Disconnect()
+                        logDebug mailbox $"Not connecting to %A{remoteEndpoint} peer count of %d{state.Settings.MaxSeedCount} exceeded"
+                        connectionRef <! Tcp.Close.Instance 
                         receive downMeter upMeter state
                 | _ ->
-                    logDebug mailbox $"Not connecting to %A{connection.RemoteEndpoint.Address}:%d{connection.RemoteEndpoint.Port} torrent not in started state anymore"
-                    connection.Disconnect()
+                    logDebug mailbox $"Not connecting to %A{remoteEndpoint} torrent not in started state anymore"
+                    connectionRef <! Tcp.Close.Instance
                     receive downMeter upMeter state
-            | Connector.ConnectFailure (endpoint, error) ->
-                logError mailbox $"Failed to connect to %A{endpoint.Address}:%d{endpoint.Port} %A{error}"
-                receive downMeter upMeter state
         
         and handlePiecesNotification downMeter upMeter (state: State) notification =
             match notification with

@@ -1,27 +1,28 @@
 namespace FBitTorrent.Core
 
-open System
 open System.Net
 open Akka.Actor
+open Akka.IO
 open Akka.FSharp
-open FBitTorrent.Core
 
 module Connector =
     
     type Command =
         | Connect of Endpoint: IPEndPoint
         
-    type CommandResult =
-        | ConnectSuccess of Connection: IConnection
-        | ConnectFailure of Endpoint: IPEndPoint * Error: Exception
+    type Notification =
+        | Connected of ConnectionRef: IActorRef * LocalEndpoint: EndPoint * RemoteEndpoint: EndPoint
     
     let actorName () = "connector"
     
-    let actorBody (asyncConnect: IPEndPoint -> Async<IConnection>) (mailbox: Actor<obj>) =
+    let actorBody notifiedRef (mailbox: Actor<obj>) =
         let rec receive () = actor {
             match! mailbox.Receive() with
             | :? Command as command ->
                 return! handleCommand command
+            
+            | :? Tcp.Event as event ->
+                return! handleTcpEvent event
                     
             | message ->
                 return! unhandled message }
@@ -29,15 +30,17 @@ module Connector =
         and handleCommand command =
             match command with
             | Connect endpoint ->
-                Async.StartAsTask(async {
-                    try
-                        let! connection = asyncConnect endpoint
-                        return ConnectSuccess connection    
-                    with exn ->
-                        return ConnectFailure (endpoint, Exception($"Failed to connect to %A{endpoint.Address}:%d{endpoint.Port}", exn))
-                }).PipeTo(mailbox.Context.Sender) |> ignore
+                mailbox.Context.System.Tcp() <! (Tcp.Connect endpoint)
                 receive ()
        
+        and handleTcpEvent event =
+            match event with
+            | :? Tcp.Connected as connected ->
+                notifiedRef <! Connected (mailbox.Context.Sender, connected.LocalAddress, connected.RemoteAddress)
+                receive ()
+            | message ->
+                unhandled message
+        
         and unhandled message =
             mailbox.Unhandled(message)
             receive ()
@@ -45,10 +48,10 @@ module Connector =
         receive ()
         
     let defaultActorBody mailbox =
-        actorBody Connection.asyncTcpConnect mailbox
+        actorBody mailbox
     
-    let spawn (actorFactory: IActorRefFactory) =
-        spawn actorFactory (actorName ()) defaultActorBody 
+    let spawn (actorFactory: IActorRefFactory) notifiedRef =
+        spawn actorFactory (actorName ()) (defaultActorBody notifiedRef) 
     
 module ConnectorExtensions =
     type IActorContext with
