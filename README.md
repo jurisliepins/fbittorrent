@@ -5,7 +5,7 @@ Implementation of the BitTorrent protocol in F# using Akka.NET.
 
 ## Details
 
-The client is implemented using [Akka.NET](https://getakka.net), which is the .NET implementation of the [Actor Model](https://en.wikipedia.org/wiki/Actor_model). In its current state the client will allow you to dowload from a `.torrent` file only. Single file and multi file torrents are supported. 
+The client is implemented using [Akka.NET](https://getakka.net), which is the .NET implementation of the [Actor Model](https://en.wikipedia.org/wiki/Actor_model). In its current state the client will allow you to download from a `.torrent` file only. Single file and multi file torrents are supported. 
 
 Main optimisations to maximise download speed have been implemented - pipelining, slow start, end game and rare piece selection. Buffer pooling has been implemented to minimise GC collection, which results in a stable memory profile. The client also supports an unlimited number of concurrently running torrents.
 
